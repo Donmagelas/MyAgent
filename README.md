@@ -4,8 +4,6 @@
 
 ---
 
-## 一句话介绍
-
 > 这是一个基于 **Java + Spring Boot + Spring AI + PostgreSQL + pgvector** 构建的工程化单主代理平台，核心能力包括 **Agent Loop、认证鉴权、混合检索 RAG、工具调用、三层记忆、Workflow / Task、SubAgent、SSE 流式输出与执行链路可观测性**。
 
 ---
