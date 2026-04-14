@@ -1,6 +1,6 @@
 # Agent
 
-**大模型问答、认证鉴权、Skill装配、RAG、工具调用、Task抽象、Workflow、执行链路追踪、记忆沉淀与可观测性、subagent** 
+**大模型问答、认证鉴权、Skill、RAG、工具调用、Task抽象、Workflow、执行链路追踪、记忆沉淀与可观测性、subagent** 
 
 ---
 
