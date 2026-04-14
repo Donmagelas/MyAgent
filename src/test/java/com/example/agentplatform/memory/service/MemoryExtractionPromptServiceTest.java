@@ -10,10 +10,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * MemoryExtractionPromptService ???
- * ????????? prompt ???????????????????????
+ * MemoryExtractionPromptService 提示词测试。
+ * 用于验证自动记忆提炼 prompt 不会再次出现乱码或规则退化。
  */
 class MemoryExtractionPromptServiceTest {
+
+    private static final String CORRUPTED_PLACEHOLDER = "\u003f\u003f\u003f\u003f";
 
     private final MemoryExtractionPromptService promptService = new MemoryExtractionPromptService();
 
@@ -25,9 +27,9 @@ class MemoryExtractionPromptServiceTest {
                 .contains("You are the long-term memory extraction module")
                 .contains("Type mapping rules:")
                 .contains("A person's name, identity, nickname, role, or location is NOT a USER_PREFERENCE")
-                .contains(""The user's name is Alice" is STABLE_FACT")
-                .contains(""The user prefers concise answers" is USER_PREFERENCE")
-                .doesNotContain("????");
+                .contains("\"The user's name is Alice\" is STABLE_FACT")
+                .contains("\"The user prefers concise answers\" is USER_PREFERENCE")
+                .doesNotContain(CORRUPTED_PLACEHOLDER);
     }
 
     @Test
@@ -59,6 +61,6 @@ class MemoryExtractionPromptServiceTest {
                 .contains("[user] I prefer concise answers.")
                 .contains("[assistant] Understood. I will keep my responses concise.")
                 .contains("Analyze this conversation window")
-                .doesNotContain("????");
+                .doesNotContain(CORRUPTED_PLACEHOLDER);
     }
 }

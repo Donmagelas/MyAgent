@@ -19,10 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 /**
- * AgentPromptService ???
- * ?????? prompt ??????????????? Agent ?????
+ * AgentPromptService 提示词测试。
+ * 用于验证关键 prompt 不会再次出现乱码或明显退化。
  */
 class AgentPromptServiceTest {
+
+    private static final String CORRUPTED_PLACEHOLDER = "\u003f\u003f\u003f\u003f";
 
     private final AgentPromptService agentPromptService = new AgentPromptService(new DirectPromptService());
 
@@ -38,7 +40,7 @@ class AgentPromptServiceTest {
                 .contains("You are the task planner for an enterprise Agent workflow.")
                 .contains("The task tool is available.")
                 .contains("Available tools:")
-                .doesNotContain("????");
+                .doesNotContain(CORRUPTED_PLACEHOLDER);
     }
 
     @Test
@@ -67,10 +69,10 @@ class AgentPromptServiceTest {
         assertThat(prompt)
                 .contains("You are the planner inside a unified Agent Loop.")
                 .contains("Allowed action types:")
-                .contains("Do not wait for the user to explicitly say "use the knowledge base" before choosing RAG.")
+                .contains("Do not wait for the user to explicitly say \"use the knowledge base\" before choosing RAG.")
                 .contains("Subagent guidance:")
                 .contains("goal: Research the document")
-                .doesNotContain("????");
+                .doesNotContain(CORRUPTED_PLACEHOLDER);
     }
 
     @Test
@@ -94,19 +96,19 @@ class AgentPromptServiceTest {
                 .contains("You are generating the final user-facing answer for an agent workflow.")
                 .contains("Available source titles:")
                 .contains("Chunk A")
-                .doesNotContain("????");
+                .doesNotContain(CORRUPTED_PLACEHOLDER);
     }
 
     /**
-     * ?????? task ????????? subagent guidance?
+     * 构造 task 工具，用于验证 prompt 中的 subagent guidance。
      */
     private RegisteredTool buildTaskTool() {
         return new RegisteredTool(
                 new PlatformToolDefinition(
                         "task",
                         "task",
-                        "??????",
-                        "????????? subagent",
+                        "任务委托",
+                        "把局部任务委托给受控 subagent",
                         "{}",
                         true,
                         true,
