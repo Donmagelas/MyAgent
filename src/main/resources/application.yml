@@ -1,0 +1,352 @@
+spring:
+  application:
+    name: agent-platform
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+  profiles:
+    active: local
+  datasource:
+    url: ${APP_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agent_platform}
+    username: ${APP_DATASOURCE_USERNAME:postgres}
+    password: ${APP_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    placeholders:
+      vector_dimensions: ${APP_VECTOR_DIMENSIONS:1024}
+  ai:
+    chat:
+      observations:
+        include-error-logging: true
+        log-prompt: false
+        log-completion: false
+    dashscope:
+      api-key: ${AI_DASHSCOPE_API_KEY:}
+      chat:
+        options:
+          model: ${APP_AI_CHAT_MODEL:qwen3.5-flash}
+      embedding:
+        enabled: false
+        options:
+          model: ${APP_AI_EMBEDDING_MODEL:qwen3-vl-embedding}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        schema-validation: false
+        schema-name: ${APP_VECTOR_SCHEMA:public}
+        table-name: ${APP_VECTOR_TABLE:rag_vector_store}
+        dimensions: ${APP_VECTOR_DIMENSIONS:1024}
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    root: INFO
+    com.example.agentplatform: INFO
+
+app:
+  ai:
+    chat-model: ${APP_AI_CHAT_MODEL:qwen3.5-flash}
+    chat-temperature: ${APP_AI_CHAT_TEMPERATURE:0.2}
+    embedding-model: ${APP_AI_EMBEDDING_MODEL:qwen3-vl-embedding}
+    rerank-model: ${APP_AI_RERANK_MODEL:qwen3-vl-rerank}
+    client:
+      connect-timeout: ${APP_AI_CLIENT_CONNECT_TIMEOUT:PT10S}
+      response-timeout: ${APP_AI_CLIENT_RESPONSE_TIMEOUT:PT30S}
+  advisor:
+    forbidden-words:
+      - bomb
+      - 炸药
+      - 毒品
+  rag:
+    vector-top-k: ${APP_RAG_VECTOR_TOP_K:8}
+    keyword-top-k: ${APP_RAG_KEYWORD_TOP_K:8}
+    max-context-chunks: ${APP_RAG_MAX_CONTEXT_CHUNKS:6}
+    similarity-threshold: ${APP_RAG_SIMILARITY_THRESHOLD:0.50}
+    keyword-min-score: ${APP_RAG_KEYWORD_MIN_SCORE:0.10}
+    chunk-size: ${APP_RAG_CHUNK_SIZE:800}
+    chunk-overlap: ${APP_RAG_CHUNK_OVERLAP:120}
+    chunking:
+      strategy: ${APP_RAG_CHUNKING_STRATEGY:section-aware}
+      markdown:
+        heading-aware: ${APP_RAG_CHUNKING_MARKDOWN_HEADING_AWARE:true}
+        chunk-size: ${APP_RAG_CHUNKING_MARKDOWN_CHUNK_SIZE:560}
+        overlap-chars: ${APP_RAG_CHUNKING_MARKDOWN_OVERLAP_CHARS:60}
+      json:
+        semantic-aware: ${APP_RAG_CHUNKING_JSON_SEMANTIC_AWARE:true}
+        chunk-size: ${APP_RAG_CHUNKING_JSON_CHUNK_SIZE:420}
+        overlap-chars: ${APP_RAG_CHUNKING_JSON_OVERLAP_CHARS:40}
+      text:
+        paragraph-aware: ${APP_RAG_CHUNKING_TEXT_PARAGRAPH_AWARE:true}
+        chunk-size: ${APP_RAG_CHUNKING_TEXT_CHUNK_SIZE:700}
+        overlap-chars: ${APP_RAG_CHUNKING_TEXT_OVERLAP_CHARS:100}
+      enhancement:
+        chunk-title-enabled: ${APP_RAG_CHUNKING_CHUNK_TITLE_ENABLED:true}
+        chunk-summary-enabled: ${APP_RAG_CHUNKING_CHUNK_SUMMARY_ENABLED:true}
+        summary-max-length: ${APP_RAG_CHUNKING_SUMMARY_MAX_LENGTH:140}
+    hybrid:
+      enabled: ${APP_RAG_HYBRID_ENABLED:true}
+      keyword-enabled: ${APP_RAG_HYBRID_KEYWORD_ENABLED:true}
+      rerank-enabled: ${APP_RAG_HYBRID_RERANK_ENABLED:true}
+      keyword-ts-config: ${APP_RAG_HYBRID_KEYWORD_TS_CONFIG:simple}
+      fusion-candidate-limit: ${APP_RAG_HYBRID_FUSION_CANDIDATE_LIMIT:8}
+      rerank-top-n: ${APP_RAG_HYBRID_RERANK_TOP_N:5}
+      vector-weight: ${APP_RAG_HYBRID_VECTOR_WEIGHT:0.6}
+      keyword-weight: ${APP_RAG_HYBRID_KEYWORD_WEIGHT:0.4}
+    query-enhancement:
+      rewrite:
+        enabled: ${APP_RAG_QUERY_REWRITE_ENABLED:true}
+        target-search-system: ${APP_RAG_QUERY_REWRITE_TARGET_SEARCH_SYSTEM:knowledge base}
+      compression:
+        enabled: ${APP_RAG_QUERY_COMPRESSION_ENABLED:false}
+      translation:
+        enabled: ${APP_RAG_QUERY_TRANSLATION_ENABLED:false}
+        target-language: ${APP_RAG_QUERY_TRANSLATION_TARGET_LANGUAGE:中文}
+      multi-query:
+        enabled: ${APP_RAG_MULTI_QUERY_ENABLED:true}
+        include-original: ${APP_RAG_MULTI_QUERY_INCLUDE_ORIGINAL:true}
+        query-count: ${APP_RAG_MULTI_QUERY_COUNT:3}
+    hallucination:
+      enabled: ${APP_RAG_HALLUCINATION_ENABLED:true}
+      insufficient-answer: ${APP_RAG_HALLUCINATION_INSUFFICIENT_ANSWER:当前检索到的证据不足以确认该问题，请提供更多上下文或更明确的资料。}
+      evidence:
+        enabled: ${APP_RAG_HALLUCINATION_EVIDENCE_ENABLED:true}
+        min-source-count: ${APP_RAG_HALLUCINATION_MIN_SOURCE_COUNT:1}
+        min-top-score: ${APP_RAG_HALLUCINATION_MIN_TOP_SCORE:0.18}
+        min-lexical-coverage: ${APP_RAG_HALLUCINATION_MIN_LEXICAL_COVERAGE:0.2}
+        inspected-chunks: ${APP_RAG_HALLUCINATION_INSPECTED_CHUNKS:3}
+      judge:
+        enabled: ${APP_RAG_HALLUCINATION_JUDGE_ENABLED:true}
+        temperature: ${APP_RAG_HALLUCINATION_JUDGE_TEMPERATURE:0.0}
+        max-tokens: ${APP_RAG_HALLUCINATION_JUDGE_MAX_TOKENS:256}
+        max-evidence-chunks: ${APP_RAG_HALLUCINATION_JUDGE_MAX_EVIDENCE_CHUNKS:4}
+        max-evidence-chars: ${APP_RAG_HALLUCINATION_JUDGE_MAX_EVIDENCE_CHARS:420}
+  memory:
+    short-term-window-size: ${APP_MEMORY_SHORT_TERM_WINDOW_SIZE:8}
+    stable-fact-limit: ${APP_MEMORY_STABLE_FACT_LIMIT:10}
+    summary-top-k: ${APP_MEMORY_SUMMARY_TOP_K:5}
+    summary-similarity-top-k: ${APP_MEMORY_SUMMARY_SIMILARITY_TOP_K:8}
+    extraction:
+      enabled: ${APP_MEMORY_EXTRACTION_ENABLED:true}
+      periodic-turn-interval: ${APP_MEMORY_EXTRACTION_PERIODIC_TURN_INTERVAL:5}
+      recent-message-window: ${APP_MEMORY_EXTRACTION_RECENT_MESSAGE_WINDOW:8}
+      summary-enabled: ${APP_MEMORY_EXTRACTION_SUMMARY_ENABLED:true}
+      temperature: ${APP_MEMORY_EXTRACTION_TEMPERATURE:0.0}
+      max-tokens: ${APP_MEMORY_EXTRACTION_MAX_TOKENS:768}
+      max-memories-per-run: ${APP_MEMORY_EXTRACTION_MAX_MEMORIES_PER_RUN:4}
+      important-keywords:
+        - 喜欢
+        - 偏好
+        - 决定
+        - 结论
+        - 完成
+        - 进度
+        - 上线
+        - 要求
+        - preference
+        - prefer
+        - decision
+        - result
+        - completed
+        - milestone
+    structured-query:
+      enabled: ${APP_MEMORY_STRUCTURED_QUERY_ENABLED:true}
+      temperature: ${APP_MEMORY_STRUCTURED_QUERY_TEMPERATURE:0.0}
+      max-tokens: ${APP_MEMORY_STRUCTURED_QUERY_MAX_TOKENS:256}
+    enabled-memory-types:
+      - USER_PREFERENCE
+      - PROJECT_STATUS
+      - DESIGN_DECISION
+      - TASK_CONCLUSION
+      - STABLE_FACT
+  security:
+    token-ttl-hours: ${APP_SECURITY_TOKEN_TTL_HOURS:12}
+    bootstrap-users:
+      - username: ${APP_SECURITY_CHAT_USER:user}
+        password: ${APP_SECURITY_CHAT_PASSWORD:123456}
+        roles:
+          - CHAT_USER
+      - username: ${APP_SECURITY_KNOWLEDGE_USER:raguser}
+        password: ${APP_SECURITY_KNOWLEDGE_PASSWORD:123456}
+        roles:
+          - CHAT_USER
+          - KNOWLEDGE_USER
+      - username: ${APP_SECURITY_ADMIN_USER:admin}
+        password: ${APP_SECURITY_ADMIN_PASSWORD:123456}
+        roles:
+          - CHAT_USER
+          - KNOWLEDGE_USER
+          - KNOWLEDGE_ADMIN
+  vector:
+    dimensions: ${APP_VECTOR_DIMENSIONS:1024}
+    schema: ${APP_VECTOR_SCHEMA:public}
+    table: ${APP_VECTOR_TABLE:rag_vector_store}
+    legacy-store-enabled: ${APP_VECTOR_LEGACY_STORE_ENABLED:false}
+  tools:
+    enabled: ${APP_TOOLS_ENABLED:true}
+    max-iterations: ${APP_TOOLS_MAX_ITERATIONS:6}
+    resolver:
+      candidate-limit: ${APP_TOOLS_RESOLVER_CANDIDATE_LIMIT:6}
+    search-api:
+      base-url: ${APP_TOOLS_SEARCH_API_BASE_URL:https://www.searchapi.io/api/v1/search}
+      api-key: ${APP_TOOLS_SEARCH_API_KEY:}
+      engine: ${APP_TOOLS_SEARCH_API_ENGINE:google}
+      default-result-limit: ${APP_TOOLS_SEARCH_API_RESULT_LIMIT:5}
+      timeout: ${APP_TOOLS_SEARCH_API_TIMEOUT:PT20S}
+      max-retries: ${APP_TOOLS_SEARCH_API_MAX_RETRIES:2}
+      retry-backoff: ${APP_TOOLS_SEARCH_API_RETRY_BACKOFF:PT1S}
+    web-page:
+      timeout: ${APP_TOOLS_WEB_PAGE_TIMEOUT:PT15S}
+      max-content-length: ${APP_TOOLS_WEB_PAGE_MAX_CONTENT_LENGTH:12000}
+      allowed-schemes:
+        - http
+        - https
+    pdf:
+      output-directory: ${APP_TOOLS_PDF_OUTPUT_DIRECTORY:./generated-pdf}
+      default-author: ${APP_TOOLS_PDF_DEFAULT_AUTHOR:agent-platform}
+  skills:
+    enabled: ${APP_SKILLS_ENABLED:true}
+    location-pattern: ${APP_SKILLS_LOCATION_PATTERN:classpath*:skills/*/skill.yaml}
+    route:
+      enabled: ${APP_SKILLS_ROUTE_ENABLED:true}
+      temperature: ${APP_SKILLS_ROUTE_TEMPERATURE:0.0}
+      max-tokens: ${APP_SKILLS_ROUTE_MAX_TOKENS:256}
+  agent:
+    enabled: ${APP_AGENT_ENABLED:true}
+    default-mode: ${APP_AGENT_DEFAULT_MODE:LOOP}
+    rag-routing:
+      enabled: ${APP_AGENT_RAG_ROUTING_ENABLED:true}
+      min-query-length: ${APP_AGENT_RAG_ROUTING_MIN_QUERY_LENGTH:4}
+      min-positive-signals: ${APP_AGENT_RAG_ROUTING_MIN_POSITIVE_SIGNALS:2}
+      question-keywords:
+        - 是什么
+        - 什么意思
+        - 哪些
+        - 哪个
+        - 如何
+        - 怎么
+        - 为什么
+        - 是否
+        - 支持
+        - 区别
+        - 差异
+        - 参数
+        - 配置
+        - 规则
+        - 要求
+        - 原理
+        - 流程
+        - 作用
+        - 用法
+        - meaning
+        - what
+        - how
+        - why
+        - which
+        - support
+        - config
+        - configuration
+        - parameter
+        - requirement
+        - requirements
+        - usage
+      domain-keywords:
+        - 知识库
+        - 文档
+        - 项目
+        - 系统
+        - 功能
+        - 玩法
+        - 模式
+        - 武器
+        - 装备
+        - 配置
+        - 参数
+        - 字段
+        - 接口
+        - 版本
+        - 模型
+        - 流程
+        - 规则
+        - 要求
+        - 干员
+        - 地图
+        - api
+        - schema
+        - json
+        - yaml
+        - yml
+        - sql
+        - java
+        - md
+        - markdown
+        - rerank
+        - embedding
+        - chunk
+        - workflow
+        - task
+        - memory
+        - advisor
+        - tool
+        - skill
+        - agent
+        - rag
+        - pgvector
+        - postgresql
+      blocked-keywords:
+        - 你好
+        - 您好
+        - 在吗
+        - 你是谁
+        - 介绍你自己
+        - 自我介绍
+        - 闲聊
+        - 聊天
+        - 讲个笑话
+        - 翻译
+        - 润色
+        - 改写
+        - 写一段
+        - 写一个
+        - 写一篇
+        - 起标题
+        - 总结这段
+    cot:
+      temperature: ${APP_AGENT_COT_TEMPERATURE:0.0}
+      max-tokens: ${APP_AGENT_COT_MAX_TOKENS:512}
+    planning:
+      enabled: ${APP_AGENT_PLANNING_ENABLED:true}
+      temperature: ${APP_AGENT_PLANNING_TEMPERATURE:0.0}
+      max-tokens: ${APP_AGENT_PLANNING_MAX_TOKENS:768}
+    loop:
+      max-iterations: ${APP_AGENT_LOOP_MAX_ITERATIONS:20}
+      planner-temperature: ${APP_AGENT_LOOP_PLANNER_TEMPERATURE:0.0}
+      planner-max-tokens: ${APP_AGENT_LOOP_PLANNER_MAX_TOKENS:512}
+    subagent:
+      enabled: ${APP_AGENT_SUBAGENT_ENABLED:true}
+      max-turns: ${APP_AGENT_SUBAGENT_MAX_TURNS:4}
+      planning-enabled: ${APP_AGENT_SUBAGENT_PLANNING_ENABLED:true}
+      allowed-tools:
+        - search_web
+        - fetch_webpage
+  observability:
+    usage-detail-limit: ${APP_OBSERVABILITY_USAGE_DETAIL_LIMIT:50}

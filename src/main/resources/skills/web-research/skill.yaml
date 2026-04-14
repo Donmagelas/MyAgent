@@ -1,0 +1,22 @@
+id: web-research
+name: 联网研究
+description: 适合搜索外部资料、抓取网页并整理公开信息。
+enabled: true
+tags:
+  - search
+  - web
+  - research
+route_keywords:
+  - 搜索
+  - 联网
+  - 网页
+  - 查询
+  - 资料
+  - 百度
+allowed_tools:
+  - search_web
+  - fetch_webpage
+tool_choice_mode: ALLOWED
+examples:
+  - 帮我搜索一下 PostgreSQL 17 的新特性
+  - 打开这个网页看看标题和主要内容

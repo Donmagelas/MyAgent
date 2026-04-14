@@ -1,0 +1,19 @@
+id: pdf-assistant
+name: PDF 助手
+description: 适合根据用户提供的标题和内容生成 PDF 文件。
+enabled: true
+tags:
+  - pdf
+  - document
+  - export
+route_keywords:
+  - pdf
+  - 导出
+  - 生成文档
+  - 生成文件
+allowed_tools:
+  - generate_pdf
+tool_choice_mode: ALLOWED
+examples:
+  - 帮我生成一个 PDF，标题是测试报告
+  - 把这段内容导出为 PDF

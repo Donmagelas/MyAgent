@@ -1,0 +1,55 @@
+*.zip
+AGENTS.md
+amnesty_qa_ragas_starter.csv
+# ===== Java / Maven / Gradle =====
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+
+# 本地 Maven 仓库缓存
+.m2/
+
+# ===== IDE =====
+.idea/
+*.iml
+.vscode/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== Logs =====
+logs/
+*.log
+
+# ===== Local env / secrets =====
+.env
+.env.*
+!.env.example
+
+# ===== Spring local config =====
+src/main/resources/application-local.yml
+src/main/resources/application-*.local.yml
+
+# 其他本地私有配置
+src/main/resources/secrets/
+src/main/resources/private/
+
+# ===== Runtime / generated files =====
+generated-pdf/
+*.tmp
+*.swp
+
+# ===== Frontend =====
+frontend/node_modules/
+frontend/dist/
+
+# ===== Python eval / cache =====
+__pycache__/
+*.pyc
+.venv/
+ragas_result*.json
+ragas_result*_rows.csv
