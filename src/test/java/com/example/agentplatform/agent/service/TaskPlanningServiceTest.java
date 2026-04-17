@@ -48,7 +48,7 @@ class TaskPlanningServiceTest {
                 new AgentProperties.Loop(6, 0.0, 512),
                 new AgentProperties.Subagent(true, 4, true, 2, 2, List.of("search_web", "fetch_webpage"))
         );
-        AiModelProperties aiModelProperties = new AiModelProperties("qwen3.5-flash", "qwen3-vl-embedding", "qwen3-vl-rerank");
+        AiModelProperties aiModelProperties = new AiModelProperties("qwen3.5-flash", 0.2d, "qwen3-vl-embedding", "qwen3-vl-rerank");
         AgentPromptService agentPromptService = new AgentPromptService(directPromptService);
         taskPlanningService = new TaskPlanningService(
                 chatModel,

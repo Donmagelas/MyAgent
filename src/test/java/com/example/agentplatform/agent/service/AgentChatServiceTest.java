@@ -29,6 +29,8 @@ import com.example.agentplatform.rag.domain.RagEvidenceAssessment;
 import com.example.agentplatform.rag.service.RagAnswerJudgeService;
 import com.example.agentplatform.rag.service.RagEvidenceGuardService;
 import com.example.agentplatform.rag.domain.RetrievedChunk;
+import com.example.agentplatform.skills.router.SkillRouterService;
+import com.example.agentplatform.skills.service.SkillToolSelector;
 import com.example.agentplatform.tools.domain.PermissionContext;
 import com.example.agentplatform.tools.domain.PlatformToolDefinition;
 import com.example.agentplatform.tools.domain.RegisteredTool;
@@ -50,6 +52,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,6 +63,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 
 /**
  * Agent 对话服务测试。
@@ -83,13 +87,17 @@ class AgentChatServiceTest {
     @Mock
     private AgentRagActionService agentRagActionService;
     @Mock
-    private AgentRagRoutingHeuristicService agentRagRoutingHeuristicService;
+    private AgentRagRoutingService agentRagRoutingService;
     @Mock
     private AgentExecutionWorkflowService agentExecutionWorkflowService;
     @Mock
     private ToolPermissionContextFactory toolPermissionContextFactory;
     @Mock
     private ToolResolverService toolResolverService;
+    @Mock
+    private SkillRouterService skillRouterService;
+    @Mock
+    private SkillToolSelector skillToolSelector;
     @Mock
     private ChatAdvisorExecutor chatAdvisorExecutor;
     @Mock
@@ -123,7 +131,8 @@ class AgentChatServiceTest {
                 new AgentProperties.Loop(6, 0.0, 512),
                 new AgentProperties.Subagent(true, 4, true, 2, 2, List.of("search_web", "fetch_webpage"))
         );
-        aiModelProperties = new AiModelProperties("qwen3.5-flash", "qwen3-vl-embedding", "qwen3-vl-rerank");
+        aiModelProperties = new AiModelProperties("qwen3.5-flash", 0.2d, "qwen3-vl-embedding", "qwen3-vl-rerank");
+        lenient().when(skillRouterService.route(any())).thenReturn(Optional.empty());
         agentChatService = new AgentChatService(
                 agentProperties,
                 aiModelProperties,
@@ -134,10 +143,12 @@ class AgentChatServiceTest {
                 taskPlanningService,
                 agentToolExecutorService,
                 agentRagActionService,
-                agentRagRoutingHeuristicService,
+                agentRagRoutingService,
                 agentExecutionWorkflowService,
                 toolPermissionContextFactory,
                 toolResolverService,
+                skillRouterService,
+                skillToolSelector,
                 chatAdvisorExecutor,
                 chatUsageService,
                 springAiChatResponseMapper,
@@ -257,7 +268,7 @@ class AgentChatServiceTest {
                 false
         ));
         when(toolResolverService.resolve(any())).thenReturn(List.of());
-        when(taskPlanningService.plan(AgentReasoningMode.LOOP, request.message(), memoryContext, List.of()))
+        when(taskPlanningService.plan(AgentReasoningMode.LOOP, request.message(), memoryContext, List.of(), null))
                 .thenReturn(new TaskPlanningService.StructuredResult<>(
                         new TaskPlan("回答 rerank 问题", "先检索证据，再给出结论", List.of()),
                         clientResponse
@@ -270,7 +281,8 @@ class AgentChatServiceTest {
                 List.of(),
                 1,
                 3,
-                new TaskPlan("回答 rerank 问题", "先检索证据，再给出结论", List.of())
+                new TaskPlan("回答 rerank 问题", "先检索证据，再给出结论", List.of()),
+                null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
                 new AgentStepPlan(
                         "先去知识库拿证据",
@@ -295,7 +307,8 @@ class AgentChatServiceTest {
                 )),
                 2,
                 3,
-                new TaskPlan("回答 rerank 问题", "先检索证据，再给出结论", List.of())
+                new TaskPlan("回答 rerank 问题", "先检索证据，再给出结论", List.of()),
+                null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
                 new AgentStepPlan(
                         "证据已足够，直接回答",
@@ -394,7 +407,7 @@ class AgentChatServiceTest {
                 false
         ));
         when(toolResolverService.resolve(any())).thenReturn(List.of());
-        when(taskPlanningService.plan(AgentReasoningMode.LOOP, request.message(), memoryContext, List.of()))
+        when(taskPlanningService.plan(AgentReasoningMode.LOOP, request.message(), memoryContext, List.of(), null))
                 .thenReturn(new TaskPlanningService.StructuredResult<>(
                         new TaskPlan("回答 rerank 配置问题", "先检索证据，再给出结论", List.of()),
                         clientResponse
@@ -407,7 +420,8 @@ class AgentChatServiceTest {
                 List.of(),
                 1,
                 3,
-                new TaskPlan("回答 rerank 配置问题", "先检索证据，再给出结论", List.of())
+                new TaskPlan("回答 rerank 配置问题", "先检索证据，再给出结论", List.of()),
+                null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
                 new AgentStepPlan(
                         "我记得这个问题和项目配置有关，可以直接回答。",
@@ -432,7 +446,8 @@ class AgentChatServiceTest {
                 )),
                 2,
                 3,
-                new TaskPlan("回答 rerank 配置问题", "先检索证据，再给出结论", List.of())
+                new TaskPlan("回答 rerank 配置问题", "先检索证据，再给出结论", List.of()),
+                null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
                 new AgentStepPlan(
                         "证据已确认，直接回答。",
@@ -444,8 +459,13 @@ class AgentChatServiceTest {
                 ),
                 clientResponse
         ));
-        when(agentRagRoutingHeuristicService.decide(request.message())).thenReturn(
-                AgentRagRoutingHeuristicService.RagRoutingDecision.force("知识型问题启发式命中：命中知识型问题词 + 命中领域事实词 + 命中结构化标识")
+        when(agentRagRoutingService.decide(request, memoryContext, 103L)).thenReturn(
+                AgentRagRoutingService.RagRoutingDecision.force(
+                        "heuristic",
+                        "知识型问题启发式命中：命中知识型问题词 + 命中领域事实词 + 命中结构化标识",
+                        request.message(),
+                        null
+                )
         );
         when(agentRagActionService.retrieve(request.message(), 103L))
                 .thenReturn(new AgentRagActionService.AgentRagActionResult(
@@ -541,7 +561,7 @@ class AgentChatServiceTest {
                 .thenReturn(executionWorkflow);
         when(toolPermissionContextFactory.create(authentication)).thenReturn(permissionContext);
         when(toolResolverService.resolve(any())).thenReturn(List.of(registeredTool));
-        when(taskPlanningService.plan(AgentReasoningMode.REACT, request.message(), memoryContext, List.of(registeredTool)))
+        when(taskPlanningService.plan(AgentReasoningMode.REACT, request.message(), memoryContext, List.of(registeredTool), null))
                 .thenReturn(new TaskPlanningService.StructuredResult<>(taskPlan, clientResponse));
         when(agentStepPlannerService.planNextStep(
                 AgentReasoningMode.REACT,
@@ -551,7 +571,8 @@ class AgentChatServiceTest {
                 List.of(),
                 1,
                 3,
-                taskPlan
+                taskPlan,
+                null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
                 new AgentStepPlan(
                         "先调用 PDF 工具直接生成结果",

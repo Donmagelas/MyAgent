@@ -6,6 +6,8 @@ import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.agent.dto.AgentChatResponse;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
 import com.example.agentplatform.observability.domain.ModelUsageRecord;
+import com.example.agentplatform.skills.domain.ResolvedSkill;
+import com.example.agentplatform.tools.domain.RegisteredTool;
 
 import java.util.List;
 
@@ -41,6 +43,21 @@ public interface AgentExecutionListener {
      * 当任务计划生成完成时触发。
      */
     default void onTaskPlan(TaskPlan taskPlan) {
+    }
+
+    /**
+     * 当主链路完成 skill 路由和工具收敛后触发。
+     */
+    default void onSkillSelected(
+            ResolvedSkill resolvedSkill,
+            List<RegisteredTool> availableTools
+    ) {
+    }
+
+    /**
+     * 当程序完成 RAG 路由判断后触发。
+     */
+    default void onRagRoutingDecision(AgentRagRoutingService.RagRoutingDecision decision) {
     }
 
     /**

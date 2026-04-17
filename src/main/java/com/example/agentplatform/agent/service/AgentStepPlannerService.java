@@ -8,6 +8,7 @@ import com.example.agentplatform.chat.service.SpringAiChatResponseMapper;
 import com.example.agentplatform.config.AgentProperties;
 import com.example.agentplatform.config.AiModelProperties;
 import com.example.agentplatform.memory.domain.MemoryContext;
+import com.example.agentplatform.skills.domain.ResolvedSkill;
 import com.example.agentplatform.tools.domain.RegisteredTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -93,6 +94,23 @@ public class AgentStepPlannerService {
             int maxSteps,
             TaskPlan taskPlan
     ) {
+        return planNextStep(mode, message, memoryContext, availableTools, scratchpad, stepIndex, maxSteps, taskPlan, null);
+    }
+
+    /**
+     * 执行带 skill 上下文的 ReAct / Agent Loop 规划。
+     */
+    public StructuredResult<AgentStepPlan> planNextStep(
+            AgentReasoningMode mode,
+            String message,
+            MemoryContext memoryContext,
+            List<RegisteredTool> availableTools,
+            List<Map<String, Object>> scratchpad,
+            int stepIndex,
+            int maxSteps,
+            TaskPlan taskPlan,
+            ResolvedSkill resolvedSkill
+    ) {
         BeanOutputConverter<AgentStepPlan> outputConverter = new BeanOutputConverter<>(AgentStepPlan.class);
         ChatClientResponse response = chatClient.prompt()
                 .options(new DefaultChatOptionsBuilder()
@@ -104,7 +122,8 @@ public class AgentStepPlannerService {
                                 mode,
                                 memoryContext,
                                 availableTools,
-                                taskPlan
+                                taskPlan,
+                                resolvedSkill
                         )
                         + "\n\n"
                         + outputConverter.getFormat())

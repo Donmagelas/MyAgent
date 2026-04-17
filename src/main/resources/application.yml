@@ -237,6 +237,13 @@ app:
       enabled: ${APP_AGENT_RAG_ROUTING_ENABLED:true}
       min-query-length: ${APP_AGENT_RAG_ROUTING_MIN_QUERY_LENGTH:4}
       min-positive-signals: ${APP_AGENT_RAG_ROUTING_MIN_POSITIVE_SIGNALS:2}
+      classifier-enabled: ${APP_AGENT_RAG_ROUTING_CLASSIFIER_ENABLED:true}
+      classifier-temperature: ${APP_AGENT_RAG_ROUTING_CLASSIFIER_TEMPERATURE:0.0}
+      classifier-max-tokens: ${APP_AGENT_RAG_ROUTING_CLASSIFIER_MAX_TOKENS:256}
+      maybe-probe-enabled: ${APP_AGENT_RAG_ROUTING_MAYBE_PROBE_ENABLED:true}
+      maybe-probe-min-hits: ${APP_AGENT_RAG_ROUTING_MAYBE_PROBE_MIN_HITS:1}
+      maybe-probe-min-score: ${APP_AGENT_RAG_ROUTING_MAYBE_PROBE_MIN_SCORE:0.18}
+      must-rag-confidence-threshold: ${APP_AGENT_RAG_ROUTING_MUST_CONFIDENCE:0.72}
       question-keywords:
         - 是什么
         - 什么意思

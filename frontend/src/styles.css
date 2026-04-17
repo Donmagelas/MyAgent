@@ -617,6 +617,16 @@ pre {
   color: var(--muted);
 }
 
+.skill-name {
+  color: var(--accent-strong);
+}
+
+.tool-list-text {
+  text-align: right;
+  color: var(--muted);
+  word-break: break-word;
+}
+
 @media (max-width: 1080px) {
   .workspace {
     grid-template-columns: 1fr;

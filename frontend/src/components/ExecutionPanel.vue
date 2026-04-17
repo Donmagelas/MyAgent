@@ -11,6 +11,18 @@
           <span>{{ TEXT.status }}</span>
           <span :class="statusClass">{{ statusText }}</span>
         </div>
+        <div class="kv-row" v-if="selectedSkill.skillName">
+          <span>{{ TEXT.selectedSkill }}</span>
+          <strong class="skill-name">{{ selectedSkill.skillName }}</strong>
+        </div>
+        <div class="kv-row" v-if="selectedSkill.routeStrategy">
+          <span>{{ TEXT.routeStrategy }}</span>
+          <span>{{ selectedSkill.routeStrategy }}</span>
+        </div>
+        <div class="kv-row" v-if="skillToolsText">
+          <span>{{ TEXT.availableTools }}</span>
+          <span class="tool-list-text">{{ skillToolsText }}</span>
+        </div>
         <div class="kv-row" v-if="streamState.workflowId">
           <span>{{ TEXT.workflow }}</span>
           <code>{{ streamState.workflowId }}</code>
@@ -93,6 +105,9 @@ const TEXT = {
   sessionInfo: '\u4f1a\u8bdd\u4fe1\u606f',
   session: '\u4f1a\u8bdd',
   status: '\u72b6\u6001',
+  selectedSkill: '\u5f53\u524d Skill',
+  routeStrategy: '\u8def\u7531\u65b9\u5f0f',
+  availableTools: '\u66b4\u9732\u5de5\u5177',
   workflow: '\u5de5\u4f5c\u6d41',
   workflowElapsed: '\u672c\u6b21\u5bf9\u8bdd\u8017\u65f6',
   modelUsage: '\u6a21\u578b\u7528\u91cf',
@@ -112,6 +127,8 @@ const MODEL_LABELS = {
 }
 const ROUTE_LABELS = {
   start: '\u5f00\u59cb',
+  skill: 'Skill \u8def\u7531',
+  'rag-route': 'RAG \u8def\u7531',
   info: '\u4fe1\u606f',
   'task-plan': '\u4efb\u52a1\u89c4\u5212',
   plan: '\u6b65\u9aa4\u51b3\u7b56',
@@ -132,6 +149,10 @@ const props = defineProps({
   streamState: {
     type: Object,
     required: true
+  },
+  selectedSkill: {
+    type: Object,
+    default: () => ({})
   },
   routeEvents: {
     type: Array,
@@ -175,6 +196,16 @@ const workflowElapsedText = computed(() => {
   }
   const elapsedMs = Math.max(new Date(completedAt).getTime() - new Date(startedAt).getTime(), 0)
   return formatLatency(elapsedMs)
+})
+
+const skillToolsText = computed(() => {
+  const tools = props.selectedSkill?.availableTools?.length
+    ? props.selectedSkill.availableTools
+    : props.selectedSkill?.allowedTools
+  if (!tools?.length) {
+    return ''
+  }
+  return tools.join(', ')
 })
 
 const modelUsageCards = computed(() => {

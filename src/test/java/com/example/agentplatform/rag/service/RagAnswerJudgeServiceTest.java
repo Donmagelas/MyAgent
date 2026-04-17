@@ -27,7 +27,7 @@ class RagAnswerJudgeServiceTest {
         ));
         RagAnswerJudgeService judgeService = new RagAnswerJudgeService(
                 mock(ChatModel.class),
-                new AiModelProperties("qwen3.5-flash", "qwen3-vl-embedding", "qwen3-vl-rerank"),
+                new AiModelProperties("qwen3.5-flash", 0.2d, "qwen3-vl-embedding", "qwen3-vl-rerank"),
                 new RagHallucinationProperties(
                         true,
                         "当前检索到的证据不足以确认该问题，请提供更多上下文或更明确的资料。",

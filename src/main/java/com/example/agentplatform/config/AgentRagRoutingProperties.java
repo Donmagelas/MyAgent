@@ -15,6 +15,40 @@ public record AgentRagRoutingProperties(
         int minPositiveSignals,
         List<String> questionKeywords,
         List<String> domainKeywords,
-        List<String> blockedKeywords
+        List<String> blockedKeywords,
+        boolean classifierEnabled,
+        double classifierTemperature,
+        int classifierMaxTokens,
+        boolean maybeProbeEnabled,
+        int maybeProbeMinHits,
+        double maybeProbeMinScore,
+        double mustRagConfidenceThreshold
 ) {
+    /**
+     * 兼容旧测试和旧构造代码，新增 AI 分类与探测参数使用默认值。
+     */
+    public AgentRagRoutingProperties(
+            boolean enabled,
+            int minQueryLength,
+            int minPositiveSignals,
+            List<String> questionKeywords,
+            List<String> domainKeywords,
+            List<String> blockedKeywords
+    ) {
+        this(
+                enabled,
+                minQueryLength,
+                minPositiveSignals,
+                questionKeywords,
+                domainKeywords,
+                blockedKeywords,
+                true,
+                0.0d,
+                256,
+                true,
+                1,
+                0.18d,
+                0.72d
+        );
+    }
 }

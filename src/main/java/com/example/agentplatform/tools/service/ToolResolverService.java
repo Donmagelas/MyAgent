@@ -55,6 +55,21 @@ public class ToolResolverService {
                 .toList();
     }
 
+    /**
+     * 解析当前用户角色下可见的全部工具。
+     * skill 被选中后，会在这批可见工具上继续按 allowedTools 收敛，避免 query 搜索漏掉 skill 允许的工具。
+     */
+    public List<RegisteredTool> resolveVisibleTools(ToolResolverRequest request) {
+        int limit = request.limit() > 0
+                ? request.limit()
+                : Math.max(resolveCandidateLimit(), 64);
+        return toolCatalogService.listEnabledTools(limit).stream()
+                .filter(entry -> isRoleAllowed(entry, request))
+                .map(entry -> getToolCallbackRegistry().findRegisteredTool(entry.toolName()).orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
     private ToolCallbackRegistry getToolCallbackRegistry() {
         return toolCallbackRegistryProvider.getObject();
     }

@@ -5,6 +5,8 @@ import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
 import com.example.agentplatform.chat.service.DirectPromptService;
 import com.example.agentplatform.memory.domain.MemoryContext;
+import com.example.agentplatform.skills.domain.ResolvedSkill;
+import com.example.agentplatform.skills.domain.SkillDefinition;
 import com.example.agentplatform.tools.domain.RegisteredTool;
 import org.springframework.stereotype.Service;
 
@@ -52,6 +54,18 @@ public class AgentPromptService {
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools
     ) {
+        return buildTaskPlanningSystemPrompt(mode, memoryContext, availableTools, null);
+    }
+
+    /**
+     * 构造带 skill 上下文的任务规划系统提示词。
+     */
+    public String buildTaskPlanningSystemPrompt(
+            AgentReasoningMode mode,
+            MemoryContext memoryContext,
+            List<RegisteredTool> availableTools,
+            ResolvedSkill resolvedSkill
+    ) {
         String toolStrategy = hasTool(availableTools, SUBAGENT_TOOL_NAME)
                 ? "The task tool is available. Recommend it in suggestedTools only when the user goal clearly contains a separable sub-task that benefits from delegated local investigation."
                 : "The task tool is not available in this context. Do not plan around subagent delegation.";
@@ -72,9 +86,12 @@ public class AgentPromptService {
                 Current reasoning mode: %s
                 %s
 
+                Selected skill:
+                %s
+
                 Available tools:
                 %s
-                """.formatted(mode.name(), toolStrategy, describeTools(availableTools));
+                """.formatted(mode.name(), toolStrategy, renderSelectedSkill(resolvedSkill), describeTools(availableTools));
     }
 
     /**
@@ -105,6 +122,19 @@ public class AgentPromptService {
             List<RegisteredTool> availableTools,
             TaskPlan taskPlan
     ) {
+        return buildLoopPlannerSystemPrompt(mode, memoryContext, availableTools, taskPlan, null);
+    }
+
+    /**
+     * 构造带 skill 上下文的统一 Agent Loop 系统提示词。
+     */
+    public String buildLoopPlannerSystemPrompt(
+            AgentReasoningMode mode,
+            MemoryContext memoryContext,
+            List<RegisteredTool> availableTools,
+            TaskPlan taskPlan,
+            ResolvedSkill resolvedSkill
+    ) {
         String planSection = taskPlan == null ? "No explicit task plan is available." : renderTaskPlan(taskPlan);
         return directPromptService.buildSystemPrompt(memoryContext) + """
 
@@ -131,6 +161,9 @@ public class AgentPromptService {
                 %s
 
                 Current reasoning mode: %s
+                Selected skill:
+                %s
+
                 Current task plan:
                 %s
 
@@ -139,6 +172,7 @@ public class AgentPromptService {
                 """.formatted(
                 buildSubagentGuidance(availableTools),
                 mode.name(),
+                renderSelectedSkill(resolvedSkill),
                 planSection,
                 describeTools(availableTools)
         );
@@ -293,6 +327,38 @@ public class AgentPromptService {
                 steps:
                 %s
                 """.formatted(taskPlan.goal(), taskPlan.planSummary(), steps);
+    }
+
+    /**
+     * 只渲染当前命中的 skill，避免把全部 skill prompt 一次性暴露给模型。
+     */
+    private String renderSelectedSkill(ResolvedSkill resolvedSkill) {
+        if (resolvedSkill == null || resolvedSkill.skillDefinition() == null) {
+            return "No skill is selected for this request.";
+        }
+        SkillDefinition skill = resolvedSkill.skillDefinition();
+        String promptContent = skill.promptContent() == null || skill.promptContent().isBlank()
+                ? "No extra skill prompt is available."
+                : skill.promptContent().trim();
+        return """
+                - skillId: %s
+                - name: %s
+                - routeStrategy: %s
+                - reason: %s
+                - toolChoiceMode: %s
+                - allowedTools: %s
+
+                Skill prompt:
+                %s
+                """.formatted(
+                skill.id(),
+                skill.name(),
+                resolvedSkill.routeStrategy(),
+                resolvedSkill.reason(),
+                skill.toolChoiceMode(),
+                skill.allowedTools(),
+                promptContent
+        );
     }
 
     /**

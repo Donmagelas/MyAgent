@@ -44,6 +44,7 @@
       <ExecutionPanel
         :session-id="sessionId"
         :stream-state="streamState"
+        :selected-skill="selectedSkill"
         :route-events="routeEvents"
         :latest-usage="latestUsage"
         :workflow-view="workflowView"
@@ -86,6 +87,7 @@ const uiText = {
   sourceSuffix: '\u6761\u6765\u6e90',
   streaming: '\u6b63\u5728\u5b9e\u65f6\u8f93\u51fa',
   usageRecorded: '\u5df2\u8bb0\u5f55\u7528\u91cf\uff1a',
+  skillSelected: '\u5df2\u9009\u62e9 skill\uff1a',
   streamDone: '\u6d41\u5f0f\u8f93\u51fa\u5b8c\u6210',
   serverError: '\u670d\u52a1\u7aef\u8fd4\u56de\u9519\u8bef',
   currentStep: '\u5f53\u524d\u6b65\u9aa4\uff1a',
@@ -112,6 +114,17 @@ const latestUsage = reactive({
   completionTokens: 0,
   totalTokens: 0,
   latencyMs: 0
+})
+
+const selectedSkill = reactive({
+  skillId: '',
+  skillName: '',
+  skillDescription: '',
+  routeStrategy: '',
+  reason: '',
+  toolChoiceMode: '',
+  allowedTools: [],
+  availableTools: []
 })
 
 const conversationState = reactive({
@@ -189,6 +202,7 @@ function logout() {
   streamState.workflowId = null
   streamState.conversationId = null
   streamState.documentStatus = ''
+  resetSelectedSkill()
   selectedFileName.value = ''
   uploadedKnowledgeDocument.value = null
   persistToLocalStorage()
@@ -219,6 +233,7 @@ function createNewSession() {
   conversationState.selectedConversationId = null
   routeEvents.value = []
   workflowView.value = null
+  resetSelectedSkill()
   streamState.mode = ''
   streamState.statusText = uiText.switchedSession
   streamState.workflowId = null
@@ -255,6 +270,7 @@ async function openConversation(conversation) {
     selectedFileName.value = ''
     routeEvents.value = []
     workflowView.value = null
+    resetSelectedSkill()
     streamState.workflowId = null
     streamState.conversationId = detail.conversationId
     streamState.mode = ''
@@ -303,6 +319,7 @@ async function sendMessage() {
   pendingUsageByStep.clear()
   routeEvents.value = []
   workflowView.value = null
+  resetSelectedSkill()
   streamState.workflowId = null
   streamState.conversationId = null
   streamState.mode = ''
@@ -411,6 +428,10 @@ function handleStreamEvent(event, assistantMessage) {
       streamState.statusText = `${uiText.usageRecorded}${event.metadata?.stepName || 'step'}`
       attachUsageToRouteEvent(event)
       return
+    case 'skill':
+      applySelectedSkill(event.metadata)
+      streamState.statusText = `${uiText.skillSelected}${selectedSkill.skillName || event.metadata?.skillId || ''}`
+      break
     case 'done':
       if (event.content != null) {
         assistantMessage.content = event.content
@@ -467,6 +488,20 @@ function applyUsage(usage) {
   latestUsage.completionTokens = usage.completionTokens ?? latestUsage.completionTokens
   latestUsage.totalTokens = usage.totalTokens ?? latestUsage.totalTokens
   latestUsage.latencyMs = usage.latencyMs ?? latestUsage.latencyMs
+}
+
+function applySelectedSkill(metadata) {
+  if (!metadata) {
+    return
+  }
+  selectedSkill.skillId = metadata.skillId || ''
+  selectedSkill.skillName = metadata.skillName || metadata.skillId || ''
+  selectedSkill.skillDescription = metadata.skillDescription || ''
+  selectedSkill.routeStrategy = metadata.routeStrategy || ''
+  selectedSkill.reason = metadata.reason || ''
+  selectedSkill.toolChoiceMode = metadata.toolChoiceMode || ''
+  selectedSkill.allowedTools = Array.isArray(metadata.allowedTools) ? metadata.allowedTools : []
+  selectedSkill.availableTools = Array.isArray(metadata.availableTools) ? metadata.availableTools : []
 }
 
 function startWorkflowPolling() {
@@ -580,6 +615,27 @@ function formatRouteMeta(event) {
   if (event.metadata?.workflowId) {
     parts.push(`${uiText.workflow}=${event.metadata.workflowId}`)
   }
+  if (event.metadata?.skillName) {
+    parts.push(`skill=${event.metadata.skillName}`)
+  }
+  if (event.metadata?.routeStrategy) {
+    parts.push(`route=${event.metadata.routeStrategy}`)
+  }
+  if (event.metadata?.routeSource) {
+    parts.push(`source=${event.metadata.routeSource}`)
+  }
+  if (event.metadata?.classifierDecision) {
+    parts.push(`classifier=${event.metadata.classifierDecision}`)
+  }
+  if (event.metadata?.forceRag != null) {
+    parts.push(`forceRag=${event.metadata.forceRag}`)
+  }
+  if (event.metadata?.probeExecuted) {
+    parts.push(`probe=${event.metadata.probeHitCount || 0}/${event.metadata.probeTopScore ?? 0}`)
+  }
+  if (event.metadata?.retrievalQuery) {
+    parts.push(`query=${event.metadata.retrievalQuery}`)
+  }
   if (event.metadata?.stepName) {
     parts.push(`${uiText.stepName}=${event.metadata.stepName}`)
   }
@@ -629,6 +685,9 @@ function resolveRouteEventUsageKeys(routeEvent) {
   }
   if (routeEvent.type === 'task-plan') {
     keys.push('agent-task-plan')
+  }
+  if (routeEvent.type === 'rag-route') {
+    keys.push('agent-rag-route-classifier')
   }
   if (routeEvent.type === 'plan') {
     const step = routeEvent.metadata?.step
@@ -683,6 +742,17 @@ function resetUsage() {
   latestUsage.completionTokens = 0
   latestUsage.totalTokens = 0
   latestUsage.latencyMs = 0
+}
+
+function resetSelectedSkill() {
+  selectedSkill.skillId = ''
+  selectedSkill.skillName = ''
+  selectedSkill.skillDescription = ''
+  selectedSkill.routeStrategy = ''
+  selectedSkill.reason = ''
+  selectedSkill.toolChoiceMode = ''
+  selectedSkill.allowedTools = []
+  selectedSkill.availableTools = []
 }
 
 async function refreshConversations() {

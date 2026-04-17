@@ -14,6 +14,7 @@ allowed_tools:
   - search_web
   - fetch_webpage
   - generate_pdf
+  - task
 tool_choice_mode: ALLOWED
 examples:
   - 用合适的工具帮我完成这个任务

@@ -8,6 +8,8 @@ import com.example.agentplatform.agent.dto.AgentChatRequest;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
 import com.example.agentplatform.chat.dto.ChatStreamEvent;
 import com.example.agentplatform.observability.domain.ModelUsageRecord;
+import com.example.agentplatform.skills.domain.ResolvedSkill;
+import com.example.agentplatform.tools.domain.RegisteredTool;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -92,6 +94,30 @@ public class AgentStreamService {
                         sessionIdRef.get(),
                         content,
                         buildTaskPlanMetadata(taskPlan)
+                )));
+            }
+
+            @Override
+            public void onSkillSelected(ResolvedSkill resolvedSkill, List<RegisteredTool> availableTools) {
+                sink.next(toSse(ChatStreamEvent.step(
+                        "skill",
+                        modeRef.get(),
+                        conversationIdRef.get(),
+                        sessionIdRef.get(),
+                        "已选择 skill：" + safe(resolvedSkill.skillDefinition().name()),
+                        buildSkillMetadata(resolvedSkill, availableTools)
+                )));
+            }
+
+            @Override
+            public void onRagRoutingDecision(AgentRagRoutingService.RagRoutingDecision decision) {
+                sink.next(toSse(ChatStreamEvent.step(
+                        "rag-route",
+                        modeRef.get(),
+                        conversationIdRef.get(),
+                        sessionIdRef.get(),
+                        buildRagRoutingContent(decision),
+                        buildRagRoutingMetadata(decision)
                 )));
             }
 
@@ -224,6 +250,59 @@ public class AgentStreamService {
         metadata.put("goal", taskPlan.goal());
         metadata.put("planSummary", taskPlan.planSummary());
         metadata.put("stepCount", taskPlan.steps() == null ? 0 : taskPlan.steps().size());
+        return metadata;
+    }
+
+    /**
+     * 构造前端展示用的 skill 路由结果元数据。
+     */
+    private Map<String, Object> buildSkillMetadata(
+            ResolvedSkill resolvedSkill,
+            List<RegisteredTool> availableTools
+    ) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("skillId", resolvedSkill.skillDefinition().id());
+        metadata.put("skillName", resolvedSkill.skillDefinition().name());
+        metadata.put("skillDescription", resolvedSkill.skillDefinition().description());
+        metadata.put("routeStrategy", resolvedSkill.routeStrategy());
+        metadata.put("reason", resolvedSkill.reason());
+        metadata.put("toolChoiceMode", resolvedSkill.skillDefinition().toolChoiceMode().name());
+        metadata.put("allowedTools", resolvedSkill.skillDefinition().allowedTools());
+        metadata.put("availableTools", availableTools == null
+                ? List.of()
+                : availableTools.stream()
+                .map(tool -> tool.definition().name())
+                .toList());
+        return metadata;
+    }
+
+    /**
+     * 构造 RAG 路由判断的前端展示文本。
+     */
+    private String buildRagRoutingContent(AgentRagRoutingService.RagRoutingDecision decision) {
+        return "RAG 路由判断：" + (decision.forceRag() ? "进入 RAG" : "不强制 RAG")
+                + "；来源=" + decision.routeSource()
+                + "；原因=" + safe(decision.reason());
+    }
+
+    /**
+     * 构造 RAG 路由判断元数据，方便前端展示 classifier 和 probe 结果。
+     */
+    private Map<String, Object> buildRagRoutingMetadata(AgentRagRoutingService.RagRoutingDecision decision) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("forceRag", decision.forceRag());
+        metadata.put("routeSource", decision.routeSource());
+        metadata.put("reason", decision.reason());
+        metadata.put("retrievalQuery", decision.retrievalQuery());
+        metadata.put("probeExecuted", decision.probeExecuted());
+        metadata.put("probeHitCount", decision.probeHitCount());
+        metadata.put("probeTopScore", decision.probeTopScore());
+        if (decision.classifierResult() != null && decision.classifierResult().body() != null) {
+            metadata.put("classifierDecision", decision.classifierResult().body().decision().name());
+            metadata.put("classifierConfidence", decision.classifierResult().body().confidence());
+            metadata.put("classifierReason", decision.classifierResult().body().reason());
+            metadata.put("needsWebSearch", decision.classifierResult().body().needsWebSearch());
+        }
         return metadata;
     }
 

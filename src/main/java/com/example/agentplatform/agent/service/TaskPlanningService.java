@@ -6,6 +6,7 @@ import com.example.agentplatform.chat.service.SpringAiChatResponseMapper;
 import com.example.agentplatform.config.AgentProperties;
 import com.example.agentplatform.config.AiModelProperties;
 import com.example.agentplatform.memory.domain.MemoryContext;
+import com.example.agentplatform.skills.domain.ResolvedSkill;
 import com.example.agentplatform.tools.domain.RegisteredTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
@@ -52,6 +53,19 @@ public class TaskPlanningService {
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools
     ) {
+        return plan(mode, message, memoryContext, availableTools, null);
+    }
+
+    /**
+     * 生成带 skill 上下文的结构化任务计划。
+     */
+    public StructuredResult<TaskPlan> plan(
+            AgentReasoningMode mode,
+            String message,
+            MemoryContext memoryContext,
+            List<RegisteredTool> availableTools,
+            ResolvedSkill resolvedSkill
+    ) {
         BeanOutputConverter<TaskPlan> outputConverter = new BeanOutputConverter<>(TaskPlan.class);
         ChatClientResponse response = chatClient.prompt()
                 .options(new DefaultChatOptionsBuilder()
@@ -59,7 +73,7 @@ public class TaskPlanningService {
                         .temperature(agentProperties.planning().temperature())
                         .maxTokens(agentProperties.planning().maxTokens())
                         .build())
-                .system(agentPromptService.buildTaskPlanningSystemPrompt(mode, memoryContext, availableTools)
+                .system(agentPromptService.buildTaskPlanningSystemPrompt(mode, memoryContext, availableTools, resolvedSkill)
                         + "\n\n"
                         + outputConverter.getFormat())
                 .user(agentPromptService.buildTaskPlanningUserPrompt(message))

@@ -29,6 +29,9 @@ import com.example.agentplatform.rag.domain.RagEvidenceAssessment;
 import com.example.agentplatform.rag.domain.RetrievedChunk;
 import com.example.agentplatform.rag.service.RagAnswerJudgeService;
 import com.example.agentplatform.rag.service.RagEvidenceGuardService;
+import com.example.agentplatform.skills.domain.ResolvedSkill;
+import com.example.agentplatform.skills.router.SkillRouterService;
+import com.example.agentplatform.skills.service.SkillToolSelector;
 import com.example.agentplatform.tools.domain.PermissionContext;
 import com.example.agentplatform.tools.domain.RegisteredTool;
 import com.example.agentplatform.tools.domain.ToolResolverRequest;
@@ -64,10 +67,12 @@ public class AgentChatService {
     private final TaskPlanningService taskPlanningService;
     private final AgentToolExecutorService agentToolExecutorService;
     private final AgentRagActionService agentRagActionService;
-    private final AgentRagRoutingHeuristicService agentRagRoutingHeuristicService;
+    private final AgentRagRoutingService agentRagRoutingService;
     private final AgentExecutionWorkflowService agentExecutionWorkflowService;
     private final ToolPermissionContextFactory toolPermissionContextFactory;
     private final ToolResolverService toolResolverService;
+    private final SkillRouterService skillRouterService;
+    private final SkillToolSelector skillToolSelector;
     private final ChatAdvisorExecutor chatAdvisorExecutor;
     private final ChatUsageService chatUsageService;
     private final SpringAiChatResponseMapper springAiChatResponseMapper;
@@ -84,10 +89,12 @@ public class AgentChatService {
             TaskPlanningService taskPlanningService,
             AgentToolExecutorService agentToolExecutorService,
             AgentRagActionService agentRagActionService,
-            AgentRagRoutingHeuristicService agentRagRoutingHeuristicService,
+            AgentRagRoutingService agentRagRoutingService,
             AgentExecutionWorkflowService agentExecutionWorkflowService,
             ToolPermissionContextFactory toolPermissionContextFactory,
             ToolResolverService toolResolverService,
+            SkillRouterService skillRouterService,
+            SkillToolSelector skillToolSelector,
             ChatAdvisorExecutor chatAdvisorExecutor,
             ChatUsageService chatUsageService,
             SpringAiChatResponseMapper springAiChatResponseMapper,
@@ -103,10 +110,12 @@ public class AgentChatService {
         this.taskPlanningService = taskPlanningService;
         this.agentToolExecutorService = agentToolExecutorService;
         this.agentRagActionService = agentRagActionService;
-        this.agentRagRoutingHeuristicService = agentRagRoutingHeuristicService;
+        this.agentRagRoutingService = agentRagRoutingService;
         this.agentExecutionWorkflowService = agentExecutionWorkflowService;
         this.toolPermissionContextFactory = toolPermissionContextFactory;
         this.toolResolverService = toolResolverService;
+        this.skillRouterService = skillRouterService;
+        this.skillToolSelector = skillToolSelector;
         this.chatAdvisorExecutor = chatAdvisorExecutor;
         this.chatUsageService = chatUsageService;
         this.springAiChatResponseMapper = springAiChatResponseMapper;
@@ -295,13 +304,13 @@ public class AgentChatService {
     ) {
         Instant startedAt = Instant.now();
         PermissionContext permissionContext = toolPermissionContextFactory.create(authentication);
-        List<RegisteredTool> availableTools = toolResolverService.resolve(new ToolResolverRequest(
-                permissionContext.userId(),
-                conversation.id(),
-                request.message(),
-                permissionContext.roles(),
-                0
-        ));
+        SkillExecutionContext skillExecutionContext = resolveSkillExecutionContext(
+                request,
+                permissionContext,
+                conversation,
+                executionListener
+        );
+        List<RegisteredTool> availableTools = skillExecutionContext.availableTools();
         TaskPlan taskPlan = buildTaskPlan(
                 request,
                 executionWorkflow.workflowId(),
@@ -309,6 +318,7 @@ public class AgentChatService {
                 buildInternalPlannerMessage(request),
                 memoryContext,
                 availableTools,
+                skillExecutionContext.resolvedSkill(),
                 conversation,
                 userMessage,
                 startedAt,
@@ -334,7 +344,8 @@ public class AgentChatService {
                     scratchpad,
                     stepIndex,
                     maxSteps,
-                    taskPlan
+                    taskPlan,
+                    skillExecutionContext.resolvedSkill()
             );
             recordUsage(
                     executionWorkflow.workflowId(),
@@ -348,7 +359,19 @@ public class AgentChatService {
 
             AgentStepPlan stepPlan = result.body();
             executedSteps = stepIndex;
-            stepPlan = applyKnowledgeRetrievalOverride(request, authentication, stepPlan, stepIndex, sourceItems);
+            stepPlan = applyKnowledgeRetrievalOverride(
+                    request,
+                    authentication,
+                    stepPlan,
+                    stepIndex,
+                    sourceItems,
+                    memoryContext,
+                    executionWorkflow.workflowId(),
+                    conversation.id(),
+                    userMessage.id(),
+                    startedAt,
+                    executionListener
+            );
             validateStepPlan(stepPlan);
             agentExecutionWorkflowService.recordPlanningStep(
                     userId,
@@ -572,13 +595,13 @@ public class AgentChatService {
             AgentExecutionListener executionListener
     ) {
         PermissionContext permissionContext = toolPermissionContextFactory.create(authentication);
-        List<RegisteredTool> availableTools = toolResolverService.resolve(new ToolResolverRequest(
-                permissionContext.userId(),
-                conversation.id(),
-                request.message(),
-                permissionContext.roles(),
-                0
-        ));
+        SkillExecutionContext skillExecutionContext = resolveSkillExecutionContext(
+                request,
+                permissionContext,
+                conversation,
+                executionListener
+        );
+        List<RegisteredTool> availableTools = skillExecutionContext.availableTools();
         TaskPlan taskPlan = buildTaskPlan(
                 request,
                 executionWorkflow.workflowId(),
@@ -586,6 +609,7 @@ public class AgentChatService {
                 buildInternalPlannerMessage(request),
                 memoryContext,
                 availableTools,
+                skillExecutionContext.resolvedSkill(),
                 conversation,
                 userMessage,
                 startedAt,
@@ -611,7 +635,8 @@ public class AgentChatService {
                     scratchpad,
                     stepIndex,
                     maxSteps,
-                    taskPlan
+                    taskPlan,
+                    skillExecutionContext.resolvedSkill()
             );
             recordUsage(
                     executionWorkflow.workflowId(),
@@ -625,7 +650,19 @@ public class AgentChatService {
 
             AgentStepPlan stepPlan = result.body();
             executedSteps = stepIndex;
-            stepPlan = applyKnowledgeRetrievalOverride(request, authentication, stepPlan, stepIndex, sourceItems);
+            stepPlan = applyKnowledgeRetrievalOverride(
+                    request,
+                    authentication,
+                    stepPlan,
+                    stepIndex,
+                    sourceItems,
+                    memoryContext,
+                    executionWorkflow.workflowId(),
+                    conversation.id(),
+                    userMessage.id(),
+                    startedAt,
+                    executionListener
+            );
             validateStepPlan(stepPlan);
             agentExecutionWorkflowService.recordPlanningStep(
                     userId,
@@ -824,6 +861,33 @@ public class AgentChatService {
         throw new ApplicationException("Agent reached the maximum number of steps");
     }
 
+    /**
+     * 先按 query 路由 skill，再根据 skill 元数据暴露允许的工具。
+     * 没有命中 skill 时保留原有 query 工具解析逻辑，避免影响普通对话。
+     */
+    private SkillExecutionContext resolveSkillExecutionContext(
+            AgentChatRequest request,
+            PermissionContext permissionContext,
+            Conversation conversation,
+            AgentExecutionListener executionListener
+    ) {
+        ToolResolverRequest resolverRequest = new ToolResolverRequest(
+                permissionContext.userId(),
+                conversation.id(),
+                request.message(),
+                permissionContext.roles(),
+                0
+        );
+        ResolvedSkill resolvedSkill = skillRouterService.route(request.message()).orElse(null);
+        if (resolvedSkill == null) {
+            return new SkillExecutionContext(null, toolResolverService.resolve(resolverRequest));
+        }
+        List<RegisteredTool> visibleTools = toolResolverService.resolveVisibleTools(resolverRequest);
+        List<RegisteredTool> availableTools = skillToolSelector.select(visibleTools, resolvedSkill);
+        executionListener.onSkillSelected(resolvedSkill, availableTools);
+        return new SkillExecutionContext(resolvedSkill, availableTools);
+    }
+
     private TaskPlan buildTaskPlan(
             AgentChatRequest request,
             Long workflowId,
@@ -831,6 +895,7 @@ public class AgentChatService {
             String message,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
+            ResolvedSkill resolvedSkill,
             Conversation conversation,
             ChatMessage userMessage,
             Instant startedAt,
@@ -845,7 +910,8 @@ public class AgentChatService {
                 mode,
                 message,
                 memoryContext,
-                availableTools
+                availableTools,
+                resolvedSkill
         );
         recordUsage(
                 workflowId,
@@ -938,7 +1004,13 @@ public class AgentChatService {
             Authentication authentication,
             AgentStepPlan stepPlan,
             int stepIndex,
-            Map<String, ChatAskResponse.SourceItem> sourceItems
+            Map<String, ChatAskResponse.SourceItem> sourceItems,
+            MemoryContext memoryContext,
+            Long workflowId,
+            Long conversationId,
+            Long messageId,
+            Instant startedAt,
+            AgentExecutionListener executionListener
     ) {
         if (stepPlan == null) {
             return null;
@@ -949,33 +1021,28 @@ public class AgentChatService {
         if (!canBiasToKnowledgeRetrieval(authentication)) {
             return stepPlan;
         }
-        if (Boolean.TRUE.equals(request.preferKnowledgeRetrieval())) {
-            return buildRagOverrideStep(
-                    stepPlan,
-                    "当前会话刚上传了知识文档，优先先做一次知识库检索。",
-                    buildKnowledgePreferredQuery(request)
-            );
-        }
-        if (!supportsKnowledgeBias(stepPlan)) {
+        if (!Boolean.TRUE.equals(request.preferKnowledgeRetrieval()) && !supportsKnowledgeBias(stepPlan)) {
             return stepPlan;
         }
-        AgentRagRoutingHeuristicService.RagRoutingDecision decision =
-                agentRagRoutingHeuristicService.decide(request.message());
+        AgentRagRoutingService.RagRoutingDecision decision =
+                agentRagRoutingService.decide(request, memoryContext, workflowId);
+        recordRagRoutingUsageIfPresent(
+                workflowId,
+                conversationId,
+                messageId,
+                decision,
+                startedAt,
+                executionListener
+        );
+        executionListener.onRagRoutingDecision(decision);
         if (!decision.forceRag()) {
             return stepPlan;
         }
         return buildRagOverrideStep(
                 stepPlan,
                 decision.reason(),
-                buildKnowledgePreferredQuery(request)
+                decision.retrievalQuery()
         );
-    }
-
-    private String buildKnowledgePreferredQuery(AgentChatRequest request) {
-        if (request.knowledgeDocumentHint() == null || request.knowledgeDocumentHint().isBlank()) {
-            return request.message();
-        }
-        return request.message() + " " + request.knowledgeDocumentHint();
     }
 
     /**
@@ -1177,6 +1244,43 @@ public class AgentChatService {
                 null
         );
         executionListener.onUsage(usageRecord);
+    }
+
+    /**
+     * 如果 RAG 路由执行了 AI 分类器，则把分类器 token usage 计入当前工作流。
+     */
+    private void recordRagRoutingUsageIfPresent(
+            Long workflowId,
+            Long conversationId,
+            Long messageId,
+            AgentRagRoutingService.RagRoutingDecision decision,
+            Instant startedAt,
+            AgentExecutionListener executionListener
+    ) {
+        if (decision == null || decision.classifierResult() == null || decision.classifierResult().response() == null) {
+            return;
+        }
+        var usageRecord = chatUsageService.save(
+                workflowId,
+                null,
+                conversationId,
+                messageId,
+                "agent-rag-route-classifier",
+                springAiChatResponseMapper.toResult(decision.classifierResult().response().chatResponse()),
+                Duration.between(startedAt, Instant.now()).toMillis(),
+                true,
+                null
+        );
+        executionListener.onUsage(usageRecord);
+    }
+
+    /**
+     * 主链路中 skill 路由后的执行上下文。
+     */
+    private record SkillExecutionContext(
+            ResolvedSkill resolvedSkill,
+            List<RegisteredTool> availableTools
+    ) {
     }
 
     private String resolveModelName(AgentStepPlannerService.StructuredResult<?> result) {

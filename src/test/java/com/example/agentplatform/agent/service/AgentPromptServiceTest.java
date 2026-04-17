@@ -6,6 +6,9 @@ import com.example.agentplatform.agent.domain.TaskPlanStep;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
 import com.example.agentplatform.chat.service.DirectPromptService;
 import com.example.agentplatform.memory.domain.MemoryContext;
+import com.example.agentplatform.skills.domain.ResolvedSkill;
+import com.example.agentplatform.skills.domain.SkillDefinition;
+import com.example.agentplatform.skills.domain.SkillToolChoiceMode;
 import com.example.agentplatform.tools.domain.PlatformToolDefinition;
 import com.example.agentplatform.tools.domain.RegisteredTool;
 import com.example.agentplatform.tools.domain.ToolRiskLevel;
@@ -72,6 +75,43 @@ class AgentPromptServiceTest {
                 .contains("Do not wait for the user to explicitly say \"use the knowledge base\" before choosing RAG.")
                 .contains("Subagent guidance:")
                 .contains("goal: Research the document")
+                .doesNotContain(CORRUPTED_PLACEHOLDER);
+    }
+
+    @Test
+    void shouldInjectOnlySelectedSkillPrompt() {
+        ResolvedSkill resolvedSkill = new ResolvedSkill(
+                new SkillDefinition(
+                        "web-research",
+                        "联网研究",
+                        "用于搜索和整理公开网页信息",
+                        true,
+                        List.of("web", "research"),
+                        List.of("搜索", "查询"),
+                        List.of("search_web", "fetch_webpage"),
+                        SkillToolChoiceMode.ALLOWED,
+                        List.of("帮我查资料"),
+                        "先搜索，再根据必要网页整理结论。",
+                        "skills/web-research"
+                ),
+                "命中搜索类关键词",
+                "rule"
+        );
+
+        String prompt = agentPromptService.buildLoopPlannerSystemPrompt(
+                AgentReasoningMode.LOOP,
+                new MemoryContext(List.of(), List.of(), List.of(), ""),
+                List.of(buildTaskTool()),
+                null,
+                resolvedSkill
+        );
+
+        assertThat(prompt)
+                .contains("Selected skill:")
+                .contains("skillId: web-research")
+                .contains("allowedTools: [search_web, fetch_webpage]")
+                .contains("Skill prompt:")
+                .contains("先搜索，再根据必要网页整理结论。")
                 .doesNotContain(CORRUPTED_PLACEHOLDER);
     }
 

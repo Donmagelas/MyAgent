@@ -41,14 +41,14 @@ class DashScopeCompatibleSpringAiChatModelObservationTest {
 
         chatModel = new DashScopeCompatibleSpringAiChatModel(
                 chatCompletionClient,
-                new AiModelProperties("qwen3.5-flash", "qwen3-vl-embedding", "qwen3-vl-rerank"),
+                new AiModelProperties("qwen3.5-flash", 0.2d, "qwen3-vl-embedding", "qwen3-vl-rerank"),
                 observationRegistry
         );
     }
 
     @Test
     void shouldPublishObservationForSynchronousCall() {
-        when(chatCompletionClient.complete(anyList(), eq("qwen3.5-flash")))
+        when(chatCompletionClient.complete(anyList(), eq("qwen3.5-flash"), eq(0.2d)))
                 .thenReturn(new ChatCompletionClient.ChatCompletionResult(
                         "req-sync-1",
                         "qwen3.5-flash",
@@ -68,7 +68,7 @@ class DashScopeCompatibleSpringAiChatModelObservationTest {
 
     @Test
     void shouldPublishObservationForStreamingCallAfterFluxCompletes() {
-        when(chatCompletionClient.stream(anyList(), eq("qwen3.5-flash")))
+        when(chatCompletionClient.stream(anyList(), eq("qwen3.5-flash"), eq(0.2d)))
                 .thenReturn(Flux.just(
                         new ChatCompletionStreamClient.ChatCompletionChunk(
                                 "req-stream-1",
