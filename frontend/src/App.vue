@@ -625,9 +625,6 @@ function formatRouteMeta(event) {
   if (event.metadata?.skillName) {
     parts.push(`skill=${event.metadata.skillName}`)
   }
-  if (event.metadata?.routeStrategy) {
-    parts.push(`route=${event.metadata.routeStrategy}`)
-  }
   if (event.metadata?.routeSource) {
     parts.push(`source=${event.metadata.routeSource}`)
   }

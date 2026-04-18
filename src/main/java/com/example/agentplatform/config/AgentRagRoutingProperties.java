@@ -1,6 +1,7 @@
 package com.example.agentplatform.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 import java.util.List;
 
@@ -24,6 +25,14 @@ public record AgentRagRoutingProperties(
         double maybeProbeMinScore,
         double mustRagConfidenceThreshold
 ) {
+    /**
+     * 显式指定使用 record 的规范构造器做配置绑定。
+     * 这样即使保留兼容旧测试的重载构造器，live 启动时也不会退回到默认构造实例化。
+     */
+    @ConstructorBinding
+    public AgentRagRoutingProperties {
+    }
+
     /**
      * 兼容旧测试和旧构造代码，新增 AI 分类与探测参数使用默认值。
      */

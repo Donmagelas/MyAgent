@@ -15,10 +15,6 @@
           <span>{{ TEXT.selectedSkill }}</span>
           <strong class="skill-name">{{ selectedSkill.skillName }}</strong>
         </div>
-        <div class="kv-row" v-if="selectedSkill.routeStrategy">
-          <span>{{ TEXT.routeStrategy }}</span>
-          <span>{{ selectedSkill.routeStrategy }}</span>
-        </div>
         <div class="kv-row" v-if="skillToolsText">
           <span>{{ TEXT.availableTools }}</span>
           <span class="tool-list-text">{{ skillToolsText }}</span>
@@ -100,13 +96,12 @@
 <script setup>
 import { computed } from 'vue'
 
-// 编码保护：该组件的展示文案统一使用 Unicode 转义，避免 PowerShell 或控制台编码污染。
+// 展示文案统一使用 Unicode 转义，避免 Windows 终端编码污染影响运行文案。
 const TEXT = {
   sessionInfo: '\u4f1a\u8bdd\u4fe1\u606f',
   session: '\u4f1a\u8bdd',
   status: '\u72b6\u6001',
   selectedSkill: '\u5f53\u524d Skill',
-  routeStrategy: '\u8def\u7531\u65b9\u5f0f',
   availableTools: '\u66b4\u9732\u5de5\u5177',
   workflow: '\u5de5\u4f5c\u6d41',
   workflowElapsed: '\u672c\u6b21\u5bf9\u8bdd\u8017\u65f6',
@@ -119,8 +114,10 @@ const TEXT = {
   noRouteEvents: '\u5f53\u524d\u8fd8\u6ca1\u6709\u94fe\u8def\u4e8b\u4ef6'
 }
 
-const MODEL_ORDER = ['qwen3.5-flash', 'qwen3-vl-embedding', 'qwen3-vl-rerank']
+const MAIN_CHAT_MODELS = ['qwen3.6-plus', 'qwen3.5-flash']
+const MODEL_ORDER = ['qwen3.6-plus', 'qwen3-vl-embedding', 'qwen3-vl-rerank']
 const MODEL_LABELS = {
+  'qwen3.6-plus': '\u4e3b\u5bf9\u8bdd\u6a21\u578b',
   'qwen3.5-flash': '\u4e3b\u5bf9\u8bdd\u6a21\u578b',
   'qwen3-vl-embedding': '\u5411\u91cf\u6a21\u578b',
   'qwen3-vl-rerank': '\u91cd\u6392\u6a21\u578b'
@@ -259,14 +256,17 @@ const modelUsageCards = computed(() => {
   return cards
 })
 
-// 主对话模型保留完整输入/输出/总量展示。
+// 主对话模型保留完整输入、输出、总量展示。
 const mainModelUsage = computed(() => {
-  return modelUsageCards.value.find((item) => item.modelName === 'qwen3.5-flash') || modelUsageCards.value[0] || null
+  return modelUsageCards.value.find((item) => MAIN_CHAT_MODELS.includes(item.modelName) && item.callCount > 0)
+    || modelUsageCards.value.find((item) => item.modelName === 'qwen3.6-plus')
+    || modelUsageCards.value[0]
+    || null
 })
 
 // 向量模型和重排模型只展示总 Token，并压缩到一行。
 const secondaryModelUsageCards = computed(() => {
-  return modelUsageCards.value.filter((item) => item.modelName !== (mainModelUsage.value?.modelName || ''))
+  return modelUsageCards.value.filter((item) => !MAIN_CHAT_MODELS.includes(item.modelName))
 })
 
 function routeTypeText(type) {

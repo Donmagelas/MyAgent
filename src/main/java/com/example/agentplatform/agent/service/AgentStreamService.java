@@ -280,7 +280,7 @@ public class AgentStreamService {
      * 构造 RAG 路由判断的前端展示文本。
      */
     private String buildRagRoutingContent(AgentRagRoutingService.RagRoutingDecision decision) {
-        return "RAG 路由判断：" + (decision.forceRag() ? "进入 RAG" : "不强制 RAG")
+        return "RAG 路由判断：" + (decision.forceRag() ? "进入 RAG" : "不进入 RAG")
                 + "；来源=" + decision.routeSource()
                 + "；原因=" + safe(decision.reason());
     }
