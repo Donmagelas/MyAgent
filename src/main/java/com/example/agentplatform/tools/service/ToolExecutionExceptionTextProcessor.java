@@ -14,7 +14,7 @@ public class ToolExecutionExceptionTextProcessor implements ToolExecutionExcepti
 
     /**
      * 权限拒绝标记。
-     * ToolChatService 会识别这个前缀，并直接向外返回 403。
+     * 上层工具执行链可识别这个前缀，并把权限拒绝与普通执行失败区分开。
      */
     public static final String PERMISSION_DENIED_PREFIX = "__PERMISSION_DENIED__:";
 

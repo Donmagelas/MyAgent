@@ -21,9 +21,6 @@ public record ToolProperties(
 ) {
 
     /**
-     * 联网搜索工具配置。
-     */
-    /**
      * 工具动态解析配置。
      */
     public record Resolver(
@@ -31,6 +28,9 @@ public record ToolProperties(
     ) {
     }
 
+    /**
+     * 联网搜索工具配置。
+     */
     public record SearchApi(
             String baseUrl,
             String apiKey,

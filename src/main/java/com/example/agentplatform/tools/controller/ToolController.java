@@ -1,16 +1,9 @@
 package com.example.agentplatform.tools.controller;
 
-import com.example.agentplatform.tools.dto.ToolChatRequest;
-import com.example.agentplatform.tools.dto.ToolChatResponse;
 import com.example.agentplatform.tools.dto.ToolDefinitionResponse;
 import com.example.agentplatform.tools.service.ToolCatalogService;
-import com.example.agentplatform.tools.service.ToolChatService;
-import jakarta.validation.Valid;
-import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
@@ -27,11 +20,9 @@ import java.util.List;
 public class ToolController {
 
     private final ToolCatalogService toolCatalogService;
-    private final ToolChatService toolChatService;
 
-    public ToolController(ToolCatalogService toolCatalogService, ToolChatService toolChatService) {
+    public ToolController(ToolCatalogService toolCatalogService) {
         this.toolCatalogService = toolCatalogService;
-        this.toolChatService = toolChatService;
     }
 
     /**
@@ -54,15 +45,6 @@ public class ToolController {
                                 definition.allowedRoles()
                         ))
                         .toList())
-                .subscribeOn(Schedulers.boundedElastic());
-    }
-
-    /**
-     * 发起一次工具对话。
-     */
-    @PostMapping("/chat")
-    public Mono<ToolChatResponse> chat(@Valid @RequestBody ToolChatRequest request, Authentication authentication) {
-        return Mono.fromCallable(() -> toolChatService.chat(request, authentication))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 }

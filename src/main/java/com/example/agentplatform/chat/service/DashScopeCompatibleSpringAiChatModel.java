@@ -145,7 +145,7 @@ public class DashScopeCompatibleSpringAiChatModel implements ChatModel {
     }
 
     /**
-     * ??????????????
+     * 解析 Spring AI Prompt 中的温度配置，未显式指定时使用全局默认温度。
      */
     private Double resolveTemperature(Prompt prompt) {
         ChatOptions options = prompt.getOptions();

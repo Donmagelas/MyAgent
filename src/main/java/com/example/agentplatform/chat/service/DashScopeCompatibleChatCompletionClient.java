@@ -169,7 +169,7 @@ public class DashScopeCompatibleChatCompletionClient implements ChatCompletionCl
     }
 
     /**
-     * ??????????????
+     * 解析本次请求使用的温度，未显式指定时使用全局默认温度。
      */
     private Double resolveTemperature(Double temperature) {
         return temperature != null ? temperature : aiModelProperties.chatTemperature();

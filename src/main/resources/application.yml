@@ -31,15 +31,6 @@ spring:
         enabled: false
         options:
           model: ${APP_AI_EMBEDDING_MODEL:qwen3-vl-embedding}
-    vectorstore:
-      pgvector:
-        initialize-schema: true
-        schema-validation: false
-        schema-name: ${APP_VECTOR_SCHEMA:public}
-        table-name: ${APP_VECTOR_TABLE:rag_vector_store}
-        dimensions: ${APP_VECTOR_DIMENSIONS:1024}
-        index-type: HNSW
-        distance-type: COSINE_DISTANCE
   jackson:
     default-property-inclusion: non_null
 
@@ -198,9 +189,6 @@ app:
           - KNOWLEDGE_ADMIN
   vector:
     dimensions: ${APP_VECTOR_DIMENSIONS:1024}
-    schema: ${APP_VECTOR_SCHEMA:public}
-    table: ${APP_VECTOR_TABLE:rag_vector_store}
-    legacy-store-enabled: ${APP_VECTOR_LEGACY_STORE_ENABLED:false}
   tools:
     enabled: ${APP_TOOLS_ENABLED:true}
     max-iterations: ${APP_TOOLS_MAX_ITERATIONS:6}

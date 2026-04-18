@@ -1,8 +1,13 @@
 package com.example.agentplatform.chat.controller;
 
+import com.example.agentplatform.agent.domain.AgentReasoningMode;
+import com.example.agentplatform.auth.service.AuthenticatedUserAccessor;
+import com.example.agentplatform.chat.dto.ChatAskRequest;
 import com.example.agentplatform.chat.dto.ChatStreamEvent;
+import com.example.agentplatform.chat.service.ChatHistoryService;
 import com.example.agentplatform.chat.service.SecuredChatFacade;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration;
@@ -18,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -38,6 +44,12 @@ class ChatControllerAgentModeWebFluxTest {
 
     @MockBean
     private SecuredChatFacade securedChatFacade;
+
+    @MockBean
+    private ChatHistoryService chatHistoryService;
+
+    @MockBean
+    private AuthenticatedUserAccessor authenticatedUserAccessor;
 
     @Test
     void shouldSupportUnifiedAgentStreamOnChatStream() {
@@ -69,6 +81,43 @@ class ChatControllerAgentModeWebFluxTest {
         org.assertj.core.api.Assertions.assertThat(events.get(0).metadata()).containsEntry("workflowId", 401);
         org.assertj.core.api.Assertions.assertThat(events.get(1).type()).isEqualTo("plan");
         org.assertj.core.api.Assertions.assertThat(events.get(2).type()).isEqualTo("done");
+    }
+
+    @Test
+    void shouldForwardFullRequestBodyToSecuredAgentStream() {
+        when(securedChatFacade.smartStream(any(), any())).thenReturn(Flux.just(
+                toSse(ChatStreamEvent.done("agent-loop", 302L, "chat-agent-forward", "ok", null))
+        ));
+
+        webTestClient.post()
+                .uri("/api/chat/stream")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue("""
+                        {
+                          "sessionId": "chat-agent-forward",
+                          "message": "请优先基于刚上传的知识文档回答",
+                          "agentMode": "LOOP",
+                          "agentMaxSteps": 20,
+                          "preferKnowledgeRetrieval": true,
+                          "knowledgeDocumentHint": "delta_force.md"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM);
+
+        // 锁定控制器只负责透传请求，真正执行仍由 SecuredChatFacade 进入 Agent 主链。
+        ArgumentCaptor<ChatAskRequest> requestCaptor = ArgumentCaptor.forClass(ChatAskRequest.class);
+        verify(securedChatFacade).smartStream(requestCaptor.capture(), any());
+        ChatAskRequest capturedRequest = requestCaptor.getValue();
+
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.sessionId()).isEqualTo("chat-agent-forward");
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.message()).isEqualTo("请优先基于刚上传的知识文档回答");
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.agentMode()).isEqualTo(AgentReasoningMode.LOOP);
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.agentMaxSteps()).isEqualTo(20);
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.preferKnowledgeRetrieval()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(capturedRequest.knowledgeDocumentHint()).isEqualTo("delta_force.md");
     }
 
     private ServerSentEvent<ChatStreamEvent> toSse(ChatStreamEvent event) {

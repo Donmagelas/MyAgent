@@ -329,6 +329,9 @@ async function sendMessage() {
   streamState.statusText = uiText.openingStream
   hasSyncedConversationDuringStream.value = false
   activeAbortController.value = new AbortController()
+  // 上传知识文档只影响下一次问答：先冻结本次请求参数，结束后清空前端偏好状态。
+  const oneShotKnowledgeDocument = uploadedKnowledgeDocument.value
+  const shouldPreferKnowledgeRetrieval = Boolean(oneShotKnowledgeDocument)
 
   try {
     await postSseStream({
@@ -338,8 +341,8 @@ async function sendMessage() {
       body: {
         sessionId: sessionId.value,
         message: userText,
-        preferKnowledgeRetrieval: Boolean(uploadedKnowledgeDocument.value),
-        knowledgeDocumentHint: uploadedKnowledgeDocument.value?.title || null
+        preferKnowledgeRetrieval: shouldPreferKnowledgeRetrieval,
+        knowledgeDocumentHint: oneShotKnowledgeDocument?.title || null
       },
       onEvent: ({ data }) => handleStreamEvent(data, assistantMessage)
     })
@@ -353,6 +356,10 @@ async function sendMessage() {
     streamState.streaming = false
     streamState.statusText = streamState.error ? uiText.executionFailed : uiText.executionDone
     activeAbortController.value = null
+    if (shouldPreferKnowledgeRetrieval) {
+      uploadedKnowledgeDocument.value = null
+      selectedFileName.value = ''
+    }
     persistToLocalStorage()
     await refreshConversations()
     if (streamState.workflowId) {
