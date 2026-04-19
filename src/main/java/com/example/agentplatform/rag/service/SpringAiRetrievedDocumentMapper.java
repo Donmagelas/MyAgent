@@ -14,12 +14,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Spring AI 鏂囨。妫€绱㈢粨鏋滄槧灏勫櫒銆? * 璐熻矗鎶?Spring AI Document 鍜?Advisor 涓婁笅鏂囪浆鎹负椤圭洰鍐呴儴鐨勬绱㈢粨鏋滃璞°€? */
+ * Spring AI 文档检索结果映射器。
+ * 负责把 Spring AI Document 和 Advisor 上下文转换为项目内部的检索结果对象。
+ */
 @Component
 public class SpringAiRetrievedDocumentMapper {
 
     /**
-     * 鎶?Spring AI 鏂囨。鍒楄〃杞崲涓哄唴閮ㄦ绱㈢粨鏋溿€?     */
+     * 把 Spring AI 文档列表转换为内部检索结果。
+     */
     public List<RetrievedChunk> toRetrievedChunks(List<Document> documents) {
         if (documents == null || documents.isEmpty()) {
             return List.of();
@@ -32,7 +35,8 @@ public class SpringAiRetrievedDocumentMapper {
     }
 
     /**
-     * 鎶婂唴閮ㄦ绱㈢粨鏋滆浆鎹负 Spring AI Document銆?     */
+     * 把内部检索结果转换为 Spring AI Document。
+     */
     public List<Document> toDocuments(List<RetrievedChunk> chunks) {
         if (chunks == null || chunks.isEmpty()) {
             return List.of();
@@ -41,7 +45,8 @@ public class SpringAiRetrievedDocumentMapper {
     }
 
     /**
-     * 浠?RetrievalAugmentationAdvisor 涓婁笅鏂囦腑鎻愬彇妫€绱㈢粨鏋溿€?     */
+     * 从 RetrievalAugmentationAdvisor 上下文中提取检索结果。
+     */
     public List<RetrievedChunk> fromAdvisorContext(Map<String, Object> context) {
         if (context == null || context.isEmpty()) {
             return List.of();
@@ -51,7 +56,8 @@ public class SpringAiRetrievedDocumentMapper {
     }
 
     /**
-     * 浠?ChatResponse metadata 涓彁鍙栨绱㈢粨鏋溿€?     */
+     * 从 ChatResponse metadata 中提取检索结果。
+     */
     public List<RetrievedChunk> fromResponseMetadata(ResponseMetadata metadata) {
         if (metadata == null || metadata.isEmpty()) {
             return List.of();
@@ -71,7 +77,8 @@ public class SpringAiRetrievedDocumentMapper {
     }
 
     /**
-     * 鎶婃绱㈢粨鏋滆浆鎹负瀵瑰杩斿洖鐨勬潵婧愬垪琛ㄣ€?     */
+     * 把检索结果转换为对外返回的来源列表。
+     */
     public List<ChatAskResponse.SourceItem> toSourceItems(List<RetrievedChunk> chunks) {
         if (chunks == null || chunks.isEmpty()) {
             return List.of();
@@ -92,7 +99,8 @@ public class SpringAiRetrievedDocumentMapper {
     }
 
     /**
-     * 浣跨敤棰勫厛妫€绱㈠嚭鐨勫€欓€夌粨鏋滆ˉ榻?Advisor 杩斿洖缁撴灉涓殑妫€绱㈢被鍨嬬瓑鍏冩暟鎹€?     */
+     * 使用预先检索出的候选结果补齐 Advisor 返回结果中的检索类型等元数据。
+     */
     public List<RetrievedChunk> mergeWithFallback(List<RetrievedChunk> actualChunks, List<RetrievedChunk> fallbackChunks) {
         if (actualChunks == null || actualChunks.isEmpty()) {
             return fallbackChunks == null ? List.of() : fallbackChunks;

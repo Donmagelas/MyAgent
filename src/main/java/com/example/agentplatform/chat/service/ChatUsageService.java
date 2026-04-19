@@ -5,7 +5,9 @@ import com.example.agentplatform.observability.service.ModelUsageLogService;
 import org.springframework.stereotype.Service;
 
 /**
- * 鑱婂ぉ usage 鍐欏叆鏈嶅姟銆? * 璐熻矗鎶婅亰澶┿€丷AG銆丄gent 绛夐摼璺殑妯″瀷璋冪敤鎴愭湰鏍囧噯鍖栬惤搴撱€? */
+ * 聊天 usage 写入服务。
+ * 负责把聊天、RAG、Agent 等链路的模型调用成本标准化落库。
+ */
 @Service
 public class ChatUsageService {
 
@@ -16,7 +18,8 @@ public class ChatUsageService {
     }
 
     /**
-     * 鍏煎鏃ц皟鐢ㄦ柟寮忕殑 usage 璁板綍鍏ュ彛銆?     */
+     * 兼容旧调用方式的 usage 记录入口。
+     */
     public ModelUsageRecord save(
             Long conversationId,
             Long messageId,
@@ -40,7 +43,8 @@ public class ChatUsageService {
     }
 
     /**
-     * 璁板綍涓€鏉″甫宸ヤ綔娴佷笂涓嬫枃鐨?usage 鏁版嵁銆?     */
+     * 记录一条带工作流上下文的 usage 数据。
+     */
     public ModelUsageRecord save(
             Long workflowId,
             Long taskId,

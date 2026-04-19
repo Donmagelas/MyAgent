@@ -9,7 +9,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * 妯″瀷 usage 鎸佷箙鍖栦粨鍌ㄣ€? * 璐熻矗鍐欏叆姝ラ绾?usage锛屽苟鏀寔鎸夊伐浣滄祦鏌ヨ鏄庣粏锛屼緵鎵ц鍙鍖栬仛鍚堜娇鐢ㄣ€? */
+ * 模型 usage 持久化仓储。
+ * 负责写入步骤级 usage，并支持按工作流查询明细，供执行可视化聚合使用。
+ */
 @Repository
 public class ModelUsageRepository {
 
@@ -20,7 +22,8 @@ public class ModelUsageRepository {
     }
 
     /**
-     * 鎸佷箙鍖栦竴鏉?usage 璁板綍銆?     */
+     * 持久化一条 usage 记录。
+     */
     public void save(ModelUsageRecord record) {
         jdbcTemplate.update("""
                 INSERT INTO model_usage_log (
@@ -46,7 +49,8 @@ public class ModelUsageRepository {
     }
 
     /**
-     * 鏌ヨ鏌愪釜宸ヤ綔娴佷笅鐨?usage 鏄庣粏銆?     */
+     * 查询某个工作流下的 usage 明细。
+     */
     public List<ModelUsageLogEntry> findByWorkflowId(Long workflowId) {
         return jdbcTemplate.query("""
                         SELECT id,

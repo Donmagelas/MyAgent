@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * 闈㈠悜搴旂敤灞傜殑 usage 鏃ュ織鏈嶅姟銆? * 璐熻矗鍐欏叆妯″瀷璋冪敤鎴愭湰锛屽苟鎻愪緵娴佺▼绾ф煡璇㈣兘鍔涖€? */
+ * 面向应用层的 usage 日志服务。
+ * 负责写入模型调用成本，并提供流程级查询能力。
+ */
 @Service
 public class ModelUsageLogService {
 
@@ -19,13 +21,15 @@ public class ModelUsageLogService {
     }
 
     /**
-     * 鎸佷箙鍖栦竴鏉℃ā鍨?usage 璁板綍銆?     */
+     * 持久化一条模型 usage 记录。
+     */
     public void save(ModelUsageRecord record) {
         modelUsageRepository.save(record);
     }
 
     /**
-     * 鏌ヨ鏌愪釜宸ヤ綔娴佷笅鐨?usage 鏄庣粏銆?     */
+     * 查询某个工作流下的 usage 明细。
+     */
     public List<ModelUsageLogEntry> findByWorkflowId(Long workflowId) {
         return modelUsageRepository.findByWorkflowId(workflowId);
     }
