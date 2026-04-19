@@ -6,6 +6,12 @@
 
 > 这是一个基于 **Java + Spring Boot + Spring AI + PostgreSQL + pgvector** 构建的工程化单主代理平台，核心能力包括 **Agent Loop、认证鉴权、混合检索 RAG、工具调用、三层记忆、Workflow / Task、SubAgent、SSE 流式输出与执行链路可观测性**。
 
+------
+
+> 我想做的是一个**agent的框架**，后续可以非常方便地往里面添加功能。
+
+> 添加了一个聚会选址的功能：根据query里的人数、地址和需求，调用高德api，帮助计算并选定聚餐地址
+
 ---
 
 ## 核心内容
