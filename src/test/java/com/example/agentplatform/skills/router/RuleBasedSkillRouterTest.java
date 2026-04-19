@@ -30,6 +30,18 @@ class RuleBasedSkillRouterTest {
     }
 
     @Test
+    void shouldRouteKnowledgeQuestionToKnowledgeBaseQaSkill() {
+        RuleBasedSkillRouter router = createRouter();
+
+        String skillId = router.route("请根据知识库回答这份文档里讲了什么")
+                .orElseThrow()
+                .skillDefinition()
+                .id();
+
+        assertEquals("knowledge-base-qa", skillId);
+    }
+
+    @Test
     void shouldFallbackToCliSkillWhenQuestionDoesNotMatchSpecificSkill() {
         RuleBasedSkillRouter router = createRouter();
 
@@ -56,7 +68,7 @@ class RuleBasedSkillRouterTest {
     private RuleBasedSkillRouter createRouter() {
         SkillProperties skillProperties = new SkillProperties(true, TEST_SKILL_LOCATION);
         SkillCatalogService skillCatalogService = new SkillCatalogService(new SkillFileLoader(skillProperties));
-        assertTrue(skillCatalogService.listEnabledSkills().size() >= 3);
+        assertTrue(skillCatalogService.listEnabledSkills().size() >= 4);
         return new RuleBasedSkillRouter(skillCatalogService);
     }
 }

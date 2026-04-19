@@ -1,0 +1,28 @@
+id: knowledge-base-qa
+name: 知识库问答
+description: 适合基于当前知识库、上传文档、项目资料或领域资料回答事实型问题。
+enabled: true
+tags:
+  - rag
+  - knowledge
+  - document
+  - qa
+route_keywords:
+  - 知识库
+  - 知识文档
+  - 上传文档
+  - 当前文档
+  - 文档里
+  - 资料里
+  - 根据文档
+  - 基于资料
+  - 基于知识库
+  - RAG
+  - chunk
+allowed_tools: []
+tool_choice_mode: NONE
+examples:
+  - 根据知识库回答这个问题
+  - 这份文档里讲了什么
+  - 基于刚才上传的资料说明配置要求
+  - 文档里有没有提到这个功能
