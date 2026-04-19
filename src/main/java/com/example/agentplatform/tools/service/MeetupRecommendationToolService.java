@@ -59,7 +59,7 @@ public class MeetupRecommendationToolService {
             @ToolParam(description = "参与人位置列表，至少包含 2 人。每项包含 name 和 address") List<MeetupParticipant> participants,
             @ToolParam(required = false, description = "候选地点关键词，例如餐厅、火锅、咖啡、商场，默认餐厅") String keyword,
             @ToolParam(required = false, description = "交通方式：transit 公共交通、driving 驾车、walking 步行，默认使用配置值") String transportMode,
-            @ToolParam(required = false, description = "候选地点数量，建议 3 到 8") Integer candidateLimit,
+            @ToolParam(required = false, description = "候选地点数量，默认不传；未指定时使用 3 个候选地点，建议 3 到 8") Integer candidateLimit,
             @ToolParam(required = false, description = "周边搜索半径，单位米，默认使用配置值") Integer radiusMeters,
             ToolContext toolContext
     ) {

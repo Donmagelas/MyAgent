@@ -1059,11 +1059,36 @@ public class AgentChatService {
      * 对不可重试工具失败生成用户可见降级答复。
      */
     private String buildNonRetryableToolFailureAnswer(String toolName, Exception exception) {
-        return "聚会地点推荐工具当前不可用，原因是外部地图服务返回了不可重试错误："
-                + collectExceptionMessages(exception)
-                + "。我不会继续重复调用 "
-                + toolName
-                + "。请稍后再试，或检查高德 API key 的额度、限流和权限配置；在工具恢复前，我无法提供可靠的实时路线耗时和候选地点排序。";
+        String errorMessage = collectExceptionMessages(exception);
+        if ("recommend_meetup_place".equals(toolName)) {
+            return "聚会地点推荐工具当前不可用，原因是外部地图服务返回了不可重试错误："
+                    + errorMessage
+                    + "。我不会继续重复调用 "
+                    + toolName
+                    + "。请稍后再试，或检查高德 API key 的额度、限流和权限配置；在工具恢复前，我无法提供可靠的实时路线耗时和候选地点排序。";
+        }
+        return "工具 "
+                + resolveToolDisplayName(toolName)
+                + " 当前不可用，原因是执行过程中返回了不可重试错误："
+                + errorMessage
+                + "。我不会继续重复调用该工具。请稍后再试，或检查该工具的权限、额度、密钥和外部服务状态。";
+    }
+
+    /**
+     * 把内部工具名转换成用户可读名称，避免通用失败文案暴露过多实现细节。
+     */
+    private String resolveToolDisplayName(String toolName) {
+        if (toolName == null || toolName.isBlank()) {
+            return "未知工具";
+        }
+        return switch (toolName) {
+            case "search_web" -> "联网搜索";
+            case "fetch_webpage" -> "网页抓取";
+            case "generate_pdf" -> "PDF 生成";
+            case "task" -> "子智能体任务";
+            case "recommend_meetup_place" -> "聚会地点推荐";
+            default -> toolName;
+        };
     }
 
     /**

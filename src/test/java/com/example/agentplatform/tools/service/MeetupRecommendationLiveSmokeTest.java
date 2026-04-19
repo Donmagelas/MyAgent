@@ -54,7 +54,6 @@ class MeetupRecommendationLiveSmokeTest {
                 "driving",
                 8,
                 20,
-                2,
                 new AmapProperties.Score(0.45d, 0.30d, 0.20d, 0.05d)
         );
         AmapClient amapClient = new AmapWebClient(WebClient.builder(), new ObjectMapper(), amapProperties);

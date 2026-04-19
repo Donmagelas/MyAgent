@@ -222,12 +222,11 @@ app:
       default-city: ${APP_TOOLS_AMAP_DEFAULT_CITY:}
       default-radius-meters: ${APP_TOOLS_AMAP_DEFAULT_RADIUS_METERS:5000}
       max-radius-meters: ${APP_TOOLS_AMAP_MAX_RADIUS_METERS:15000}
-      default-candidate-limit: ${APP_TOOLS_AMAP_CANDIDATE_LIMIT:2}
+      default-candidate-limit: ${APP_TOOLS_AMAP_CANDIDATE_LIMIT:3}
       max-candidate-limit: ${APP_TOOLS_AMAP_MAX_CANDIDATE_LIMIT:8}
       route-mode: ${APP_TOOLS_AMAP_ROUTE_MODE:transit}
       max-participants: ${APP_TOOLS_AMAP_MAX_PARTICIPANTS:8}
       max-route-calculations: ${APP_TOOLS_AMAP_MAX_ROUTE_CALCULATIONS:80}
-      route-concurrency: ${APP_TOOLS_AMAP_ROUTE_CONCURRENCY:4}
       score:
         total-duration-weight: ${APP_TOOLS_AMAP_SCORE_TOTAL_DURATION_WEIGHT:0.45}
         max-duration-weight: ${APP_TOOLS_AMAP_SCORE_MAX_DURATION_WEIGHT:0.30}

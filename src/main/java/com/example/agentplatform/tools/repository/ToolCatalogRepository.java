@@ -17,6 +17,7 @@ import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 工具目录仓储。
@@ -120,6 +121,38 @@ public class ToolCatalogRepository {
                     tags = EXCLUDED.tags,
                     scopes = EXCLUDED.scopes,
                     updated_at = CURRENT_TIMESTAMP
+                """, parameters);
+    }
+
+    /**
+     * 禁用代码中已知但当前配置下不可用的本地工具，避免旧目录记录继续暴露给前端或 planner。
+     */
+    public void disableKnownToolsNotIn(Set<String> knownToolNames, Set<String> activeToolNames) {
+        if (knownToolNames == null || knownToolNames.isEmpty()) {
+            return;
+        }
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("knownToolNames", knownToolNames);
+        if (activeToolNames == null || activeToolNames.isEmpty()) {
+            namedParameterJdbcTemplate.update("""
+                    UPDATE tool_definition
+                    SET enabled = FALSE,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE enabled = TRUE
+                      AND tool_name IN (:knownToolNames)
+                    """, parameters);
+            return;
+        }
+
+        parameters.addValue("activeToolNames", activeToolNames);
+        namedParameterJdbcTemplate.update("""
+                UPDATE tool_definition
+                SET enabled = FALSE,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE enabled = TRUE
+                  AND tool_name IN (:knownToolNames)
+                  AND tool_name NOT IN (:activeToolNames)
                 """, parameters);
     }
 

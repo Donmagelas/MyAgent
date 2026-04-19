@@ -26,7 +26,6 @@ public record AmapProperties(
         String routeMode,
         int maxParticipants,
         int maxRouteCalculations,
-        int routeConcurrency,
         Score score
 ) {
 
@@ -38,12 +37,11 @@ public record AmapProperties(
         defaultCity = defaultCity == null ? "" : defaultCity.trim();
         defaultRadiusMeters = defaultRadiusMeters <= 0 ? 5_000 : defaultRadiusMeters;
         maxRadiusMeters = maxRadiusMeters <= 0 ? 15_000 : maxRadiusMeters;
-        defaultCandidateLimit = defaultCandidateLimit <= 0 ? 5 : defaultCandidateLimit;
+        defaultCandidateLimit = defaultCandidateLimit <= 0 ? 3 : defaultCandidateLimit;
         maxCandidateLimit = maxCandidateLimit <= 0 ? 8 : maxCandidateLimit;
         routeMode = StringUtils.hasText(routeMode) ? routeMode.trim().toLowerCase() : "transit";
         maxParticipants = maxParticipants <= 0 ? 8 : maxParticipants;
         maxRouteCalculations = maxRouteCalculations <= 0 ? 80 : maxRouteCalculations;
-        routeConcurrency = routeConcurrency <= 0 ? 4 : routeConcurrency;
         score = score == null ? new Score(0.45d, 0.30d, 0.20d, 0.05d) : score;
     }
 

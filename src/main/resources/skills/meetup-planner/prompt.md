@@ -15,13 +15,13 @@
 - `participants`：参与人列表，每个人包含 `name` 和 `address`。至少 2 人。
 - `keyword`：地点关键词，例如餐厅、火锅、咖啡、商场。用户没指定时默认餐厅。
 - `transportMode`：交通方式，可选 `transit`、`driving`、`walking`。用户没指定时默认公共交通。
-- `candidateLimit`：候选地点数量，默认不需要显式传。
+- `candidateLimit`：候选地点数量，默认不需要显式传；后端默认使用 3 个候选地点。
 - `radiusMeters`：周边搜索半径，默认不需要显式传。
 
 ## 工具使用规则
 
 - 满足 city 和至少 2 个参与人位置后，优先调用 `recommend_meetup_place`。
-- 为降低地图 API 消耗，默认只请求 2 个候选地点；除非用户明确要求更多，不要提高 `candidateLimit`。
+- 默认请求 3 个候选地点；除非用户明确要求更多，不要提高 `candidateLimit`。
 - 不要编造经纬度、路线时间、距离或候选地点。
 - 如果用户只说“帮我们找地方”，但没有城市或参与人位置，先追问缺失信息。
 - 如果工具返回 warnings，要在回答中简要说明限制。

@@ -30,6 +30,6 @@ public class ToolCatalogBootstrap implements ApplicationRunner {
         List<PlatformToolDefinition> definitions = toolCallbackRegistry.getRegisteredTools().stream()
                 .map(registeredTool -> registeredTool.definition())
                 .toList();
-        toolCatalogService.syncRegisteredTools(definitions);
+        toolCatalogService.syncRegisteredTools(definitions, toolCallbackRegistry.getKnownToolNames());
     }
 }

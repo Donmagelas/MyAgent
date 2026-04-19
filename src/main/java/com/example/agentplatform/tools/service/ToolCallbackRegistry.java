@@ -1,6 +1,7 @@
 package com.example.agentplatform.tools.service;
 
 import com.example.agentplatform.auth.domain.SecurityRole;
+import com.example.agentplatform.config.AmapProperties;
 import com.example.agentplatform.tools.domain.PlatformToolDefinition;
 import com.example.agentplatform.tools.domain.RegisteredTool;
 import com.example.agentplatform.tools.domain.ToolRiskLevel;
@@ -8,7 +9,10 @@ import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.resolution.StaticToolCallbackResolver;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,6 +28,7 @@ import java.util.stream.Collectors;
 public class ToolCallbackRegistry {
 
     private final List<RegisteredTool> registeredTools;
+    private final List<String> knownToolNames;
     private final Map<String, RegisteredTool> toolIndex;
     private final StaticToolCallbackResolver toolCallbackResolver;
 
@@ -32,7 +37,8 @@ public class ToolCallbackRegistry {
             WebPageFetchToolService webPageFetchToolService,
             PdfGenerateToolService pdfGenerateToolService,
             SubagentTaskToolService subagentTaskToolService,
-            MeetupRecommendationToolService meetupRecommendationToolService
+            MeetupRecommendationToolService meetupRecommendationToolService,
+            AmapProperties amapProperties
     ) {
         ToolCallback[] callbacks = ToolCallbacks.from(
                 searchToolService,
@@ -41,83 +47,92 @@ public class ToolCallbackRegistry {
                 subagentTaskToolService,
                 meetupRecommendationToolService
         );
-        this.registeredTools = List.of(
-                buildRegisteredTool(
-                        callbacks,
-                        "search_web",
-                        "search_web",
-                        "联网搜索",
-                        false,
-                        false,
-                        false,
-                        false,
-                        20_000L,
-                        ToolRiskLevel.MEDIUM,
-                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
-                        List.of("search", "web", "internet"),
-                        List.of("chat", "research")
-                ),
-                buildRegisteredTool(
-                        callbacks,
-                        "fetch_webpage",
-                        "fetch_webpage",
-                        "网页抓取",
-                        true,
-                        false,
-                        false,
-                        false,
-                        15_000L,
-                        ToolRiskLevel.MEDIUM,
-                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
-                        List.of("fetch", "webpage", "html"),
-                        List.of("chat", "research")
-                ),
-                buildRegisteredTool(
-                        callbacks,
-                        "generate_pdf",
-                        "generate_pdf",
-                        "PDF 生成",
-                        false,
-                        true,
-                        false,
-                        true,
-                        30_000L,
-                        ToolRiskLevel.MEDIUM,
-                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
-                        List.of("pdf", "document", "export"),
-                        List.of("chat", "output")
-                ),
-                buildRegisteredTool(
-                        callbacks,
-                        "task",
-                        "task",
-                        "子智能体任务",
-                        true,
-                        false,
-                        false,
-                        false,
-                        60_000L,
-                        ToolRiskLevel.MEDIUM,
-                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
-                        List.of("subagent", "task", "delegation"),
-                        List.of("agent", "chat")
-                ),
-                buildRegisteredTool(
-                        callbacks,
-                        "recommend_meetup_place",
-                        "recommend_meetup_place",
-                        "聚会地点推荐",
-                        true,
-                        false,
-                        false,
-                        false,
-                        45_000L,
-                        ToolRiskLevel.MEDIUM,
-                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
-                        List.of("map", "amap", "meetup", "poi", "route"),
-                        List.of("chat", "location", "planning")
-                )
-        );
+        this.knownToolNames = Arrays.stream(callbacks)
+                .map(callback -> callback.getToolDefinition().name())
+                .toList();
+
+        List<RegisteredTool> tools = new ArrayList<>();
+        tools.add(buildRegisteredTool(
+                callbacks,
+                "search_web",
+                "search_web",
+                "联网搜索",
+                false,
+                false,
+                false,
+                false,
+                20_000L,
+                ToolRiskLevel.MEDIUM,
+                Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
+                List.of("search", "web", "internet"),
+                List.of("chat", "research")
+        ));
+        tools.add(buildRegisteredTool(
+                callbacks,
+                "fetch_webpage",
+                "fetch_webpage",
+                "网页抓取",
+                true,
+                false,
+                false,
+                false,
+                15_000L,
+                ToolRiskLevel.MEDIUM,
+                Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
+                List.of("fetch", "webpage", "html"),
+                List.of("chat", "research")
+        ));
+        tools.add(buildRegisteredTool(
+                callbacks,
+                "generate_pdf",
+                "generate_pdf",
+                "PDF 生成",
+                false,
+                true,
+                false,
+                true,
+                30_000L,
+                ToolRiskLevel.MEDIUM,
+                Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
+                List.of("pdf", "document", "export"),
+                List.of("chat", "output")
+        ));
+        tools.add(buildRegisteredTool(
+                callbacks,
+                "task",
+                "task",
+                "子智能体任务",
+                true,
+                false,
+                false,
+                false,
+                60_000L,
+                ToolRiskLevel.MEDIUM,
+                Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
+                List.of("subagent", "task", "delegation"),
+                List.of("agent", "chat")
+        ));
+
+        // 高德工具依赖外部 key 和开关；不可用时不注册，避免 planner 看到无法执行的工具。
+        if (isAmapToolAvailable(amapProperties)) {
+            tools.add(buildRegisteredTool(
+                    callbacks,
+                    "recommend_meetup_place",
+                    "recommend_meetup_place",
+                    "聚会地点推荐",
+                    true,
+                    false,
+                    false,
+                    false,
+                    45_000L,
+                    ToolRiskLevel.MEDIUM,
+                    Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
+                    List.of("map", "amap", "meetup", "poi", "route"),
+                    List.of("chat", "location", "planning")
+            ));
+        }
+
+        this.registeredTools = List.copyOf(tools);
         this.toolIndex = registeredTools.stream()
                 .collect(Collectors.toUnmodifiableMap(tool -> tool.definition().name(), Function.identity()));
         this.toolCallbackResolver = new StaticToolCallbackResolver(getToolCallbacks());
@@ -137,6 +152,14 @@ public class ToolCallbackRegistry {
         return registeredTools.stream()
                 .map(RegisteredTool::callback)
                 .toList();
+    }
+
+    /**
+     * 返回代码中定义过的本地工具名。
+     * 目录同步会用它禁用当前配置下不可暴露的旧工具记录。
+     */
+    public List<String> getKnownToolNames() {
+        return knownToolNames;
     }
 
     /**
@@ -208,5 +231,11 @@ public class ToolCallbackRegistry {
                 .filter(callback -> toolName.equals(callback.getToolDefinition().name()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Tool callback not found: " + toolName));
+    }
+
+    private boolean isAmapToolAvailable(AmapProperties amapProperties) {
+        return amapProperties != null
+                && amapProperties.enabled()
+                && StringUtils.hasText(amapProperties.apiKey());
     }
 }
