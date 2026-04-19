@@ -155,6 +155,7 @@ public class AgentPromptService {
                 - For knowledge-base style factual questions, prefer RAG before web search.
                 - Do not fabricate facts. If evidence is weak, prefer RAG or a cautious final answer.
                 - Avoid repeating the same action unless the latest observation clearly justifies it.
+                - If the scratchpad contains a non-retryable tool failure, do not call that tool again; choose FINAL and explain the tool is temporarily unavailable.
                 - If the task tool is available, use it only for a separable sub-problem; never recurse blindly.
 
                 Subagent guidance:

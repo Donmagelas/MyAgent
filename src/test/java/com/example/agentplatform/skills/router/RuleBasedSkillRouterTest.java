@@ -42,7 +42,7 @@ class RuleBasedSkillRouterTest {
     }
 
     @Test
-    void shouldFallbackToCliSkillWhenQuestionDoesNotMatchSpecificSkill() {
+    void shouldFallbackToGeneralSkillWhenQuestionDoesNotMatchSpecificSkill() {
         RuleBasedSkillRouter router = createRouter();
 
         String skillId = router.route("帮我处理一下这个任务")
@@ -65,10 +65,22 @@ class RuleBasedSkillRouterTest {
         assertEquals("pdf-assistant", skillId);
     }
 
+    @Test
+    void shouldRouteMeetupQuestionToMeetupPlannerSkill() {
+        RuleBasedSkillRouter router = createRouter();
+
+        String skillId = router.route("我们三个人想在苏州聚餐，推荐一个大家通勤都公平的火锅店")
+                .orElseThrow()
+                .skillDefinition()
+                .id();
+
+        assertEquals("meetup-planner", skillId);
+    }
+
     private RuleBasedSkillRouter createRouter() {
         SkillProperties skillProperties = new SkillProperties(true, TEST_SKILL_LOCATION);
         SkillCatalogService skillCatalogService = new SkillCatalogService(new SkillFileLoader(skillProperties));
-        assertTrue(skillCatalogService.listEnabledSkills().size() >= 4);
+        assertTrue(skillCatalogService.listEnabledSkills().size() >= 5);
         return new RuleBasedSkillRouter(skillCatalogService);
     }
 }

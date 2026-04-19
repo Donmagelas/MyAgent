@@ -496,10 +496,33 @@ public class AgentChatService {
                 }
             }
             catch (Exception exception) {
-                observation = "Tool execution failed: " + exception.getMessage();
+                observation = buildToolFailureObservation(exception);
                 agentExecutionWorkflowService.recordObservation(userId, executionWorkflow, stepIndex, observation);
                 executionListener.onObservation(stepIndex, stepPlan.toolName(), observation);
-                scratchpad.add(buildScratchpadEntry(stepIndex, stepPlan.thought(), stepPlan.toolName(), observation));
+                scratchpad.add(buildScratchpadEntry(
+                        stepIndex,
+                        stepPlan.thought(),
+                        buildFailedToolScratchpadAction(stepPlan.toolName(), exception),
+                        observation
+                ));
+                if (isNonRetryableToolFailure(exception)) {
+                    return new AgentStreamingExecutionPlan(
+                            userId,
+                            executionWorkflow,
+                            conversation,
+                            memoryContext,
+                            mode,
+                            request.message(),
+                            buildNonRetryableToolFailureAnswer(stepPlan.toolName(), exception),
+                            buildLoopReasoningSummary(executedSteps, usedTools, sourceItems.values()),
+                            executedSteps,
+                            new ArrayList<>(usedTools),
+                            new ArrayList<>(sourceItems.values()),
+                            new ArrayList<>(retrievedChunks.values()),
+                            false,
+                            "agent-loop-tool-failure"
+                    );
+                }
             }
         }
 
@@ -851,10 +874,46 @@ public class AgentChatService {
                 }
             }
             catch (Exception exception) {
-                observation = "Tool execution failed: " + exception.getMessage();
+                observation = buildToolFailureObservation(exception);
                 agentExecutionWorkflowService.recordObservation(userId, executionWorkflow, stepIndex, observation);
                 executionListener.onObservation(stepIndex, stepPlan.toolName(), observation);
-                scratchpad.add(buildScratchpadEntry(stepIndex, stepPlan.thought(), stepPlan.toolName(), observation));
+                scratchpad.add(buildScratchpadEntry(
+                        stepIndex,
+                        stepPlan.thought(),
+                        buildFailedToolScratchpadAction(stepPlan.toolName(), exception),
+                        observation
+                ));
+                if (isNonRetryableToolFailure(exception)) {
+                    String finalAnswer = buildNonRetryableToolFailureAnswer(stepPlan.toolName(), exception);
+                    ChatMessage assistantMessage = chatPersistenceService.saveAssistantMessage(
+                            userId,
+                            conversation.id(),
+                            finalAnswer,
+                            aiModelProperties.chatModel()
+                    );
+                    String reasoningSummary = buildLoopReasoningSummary(executedSteps, usedTools, sourceItems.values());
+                    agentExecutionWorkflowService.completeSuccess(
+                            userId,
+                            executionWorkflow,
+                            finalAnswer,
+                            reasoningSummary,
+                            executedSteps,
+                            new ArrayList<>(usedTools)
+                    );
+                    AgentChatResponse response = new AgentChatResponse(
+                            executionWorkflow.workflowId(),
+                            conversation.id(),
+                            conversation.sessionId(),
+                            mode,
+                            assistantMessage.content(),
+                            reasoningSummary,
+                            executedSteps,
+                            new ArrayList<>(usedTools),
+                            new ArrayList<>(sourceItems.values())
+                    );
+                    executionListener.onFinal(response);
+                    return response;
+                }
             }
         }
 
@@ -951,6 +1010,81 @@ public class AgentChatService {
                 && (stepPlan.ragQuery() == null || stepPlan.ragQuery().isBlank())) {
             throw new ApplicationException("RAG step is missing ragQuery");
         }
+    }
+
+    /**
+     * 构造工具失败观测文本。
+     * 不可重试失败会显式标记，避免模型在下一轮继续调用同一个外部服务。
+     */
+    private String buildToolFailureObservation(Exception exception) {
+        String message = collectExceptionMessages(exception);
+        if (isNonRetryableToolFailure(exception)) {
+            return "Non-retryable tool failure: " + message;
+        }
+        return "Tool execution failed: " + message;
+    }
+
+    /**
+     * 构造 scratchpad 中的失败动作标记。
+     */
+    private String buildFailedToolScratchpadAction(String toolName, Exception exception) {
+        if (isNonRetryableToolFailure(exception)) {
+            return "NON_RETRYABLE_TOOL_FAILURE:" + toolName;
+        }
+        return toolName;
+    }
+
+    /**
+     * 判断工具失败是否属于继续重试也不会恢复的类型。
+     */
+    private boolean isNonRetryableToolFailure(Exception exception) {
+        String message = collectExceptionMessages(exception).toLowerCase();
+        return message.contains("限制超限")
+                || message.contains("额度")
+                || message.contains("quota")
+                || message.contains("over limit")
+                || message.contains("over_limit")
+                || message.contains("exceeded")
+                || message.contains("cuqps")
+                || message.contains("daily_query")
+                || message.contains("access too frequent")
+                || message.contains("permission denied")
+                || message.contains("invalid user key")
+                || message.contains("key不正确")
+                || message.contains("key 未配置")
+                || message.contains("未配置");
+    }
+
+    /**
+     * 对不可重试工具失败生成用户可见降级答复。
+     */
+    private String buildNonRetryableToolFailureAnswer(String toolName, Exception exception) {
+        return "聚会地点推荐工具当前不可用，原因是外部地图服务返回了不可重试错误："
+                + collectExceptionMessages(exception)
+                + "。我不会继续重复调用 "
+                + toolName
+                + "。请稍后再试，或检查高德 API key 的额度、限流和权限配置；在工具恢复前，我无法提供可靠的实时路线耗时和候选地点排序。";
+    }
+
+    /**
+     * 汇总异常链路中的关键信息，避免只看到最外层包装异常。
+     */
+    private String collectExceptionMessages(Throwable throwable) {
+        if (throwable == null) {
+            return "unknown error";
+        }
+        List<String> messages = new ArrayList<>();
+        Throwable current = throwable;
+        while (current != null && messages.size() < 5) {
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                messages.add(current.getMessage());
+            }
+            current = current.getCause();
+        }
+        if (messages.isEmpty()) {
+            return throwable.getClass().getSimpleName();
+        }
+        return String.join(" | ", messages);
     }
 
     private Map<String, Object> buildScratchpadEntry(int stepIndex, String thought, String action, String observation) {

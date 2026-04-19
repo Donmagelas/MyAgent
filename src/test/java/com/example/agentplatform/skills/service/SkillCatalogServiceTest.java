@@ -27,11 +27,12 @@ class SkillCatalogServiceTest {
 
         List<SkillDefinition> skills = skillCatalogService.listEnabledSkills();
 
-        assertEquals(4, skills.size());
+        assertEquals(5, skills.size());
         assertTrue(skills.stream().anyMatch(skill -> skill.id().equals("web-research")));
         assertTrue(skills.stream().anyMatch(skill -> skill.id().equals("pdf-assistant")));
         assertTrue(skills.stream().anyMatch(skill -> skill.id().equals("general-tool-agent")));
         assertTrue(skills.stream().anyMatch(skill -> skill.id().equals("knowledge-base-qa")));
+        assertTrue(skills.stream().anyMatch(skill -> skill.id().equals("meetup-planner")));
         assertFalse(skillCatalogService.findEnabledSkill("missing-skill").isPresent());
     }
 }

@@ -1,0 +1,30 @@
+id: meetup-planner
+name: 聚会地点推荐
+description: 适合根据多人位置、聚餐偏好、集合需求，推荐相对公平的见面地点。
+enabled: true
+tags:
+  - meetup
+  - map
+  - amap
+  - route
+  - poi
+route_keywords:
+  - 聚餐
+  - 约饭
+  - 聚会
+  - 集合地点
+  - 见面地点
+  - 中间地点
+  - 去哪吃
+  - 通勤
+  - 火锅
+  - 餐厅
+  - 咖啡
+  - 商场
+allowed_tools:
+  - recommend_meetup_place
+tool_choice_mode: ALLOWED
+examples:
+  - 我们三个人想聚餐，我在苏州大学，小王在湖东，小李在狮山路，推荐一个火锅店
+  - 帮我们找一个大家过去都比较公平的见面地点
+  - 我们想在上海约饭，帮我按通勤时间推荐位置

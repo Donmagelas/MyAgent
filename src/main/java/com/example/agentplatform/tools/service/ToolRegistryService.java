@@ -30,13 +30,15 @@ public class ToolRegistryService {
             SearchToolService searchToolService,
             WebPageFetchToolService webPageFetchToolService,
             PdfGenerateToolService pdfGenerateToolService,
-            SubagentTaskToolService subagentTaskToolService
+            SubagentTaskToolService subagentTaskToolService,
+            MeetupRecommendationToolService meetupRecommendationToolService
     ) {
         ToolCallback[] callbacks = ToolCallbacks.from(
                 searchToolService,
                 webPageFetchToolService,
                 pdfGenerateToolService,
-                subagentTaskToolService
+                subagentTaskToolService,
+                meetupRecommendationToolService
         );
         this.registeredTools = List.of(
                 buildRegisteredTool(callbacks, "search_web", "search_web", "联网搜索", false, false, false, false, 20_000L, ToolRiskLevel.MEDIUM,
@@ -46,7 +48,9 @@ public class ToolRegistryService {
                 buildRegisteredTool(callbacks, "generate_pdf", "generate_pdf", "PDF 生成", false, true, false, true, 30_000L, ToolRiskLevel.MEDIUM,
                         Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN), List.of("pdf", "export"), List.of("chat", "output")),
                 buildRegisteredTool(callbacks, "task", "task", "子智能体任务", true, false, false, false, 60_000L, ToolRiskLevel.MEDIUM,
-                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN), List.of("subagent", "task"), List.of("agent", "chat"))
+                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN), List.of("subagent", "task"), List.of("agent", "chat")),
+                buildRegisteredTool(callbacks, "recommend_meetup_place", "recommend_meetup_place", "聚会地点推荐", true, false, false, false, 45_000L, ToolRiskLevel.MEDIUM,
+                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN), List.of("map", "amap", "meetup", "poi", "route"), List.of("chat", "location", "planning"))
         );
         this.toolIndex = registeredTools.stream()
                 .collect(Collectors.toUnmodifiableMap(tool -> tool.definition().name(), Function.identity()));

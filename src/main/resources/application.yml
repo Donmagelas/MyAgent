@@ -211,6 +211,28 @@ app:
     pdf:
       output-directory: ${APP_TOOLS_PDF_OUTPUT_DIRECTORY:./generated-pdf}
       default-author: ${APP_TOOLS_PDF_DEFAULT_AUTHOR:agent-platform}
+    amap:
+      enabled: ${APP_TOOLS_AMAP_ENABLED:true}
+      base-url: ${APP_TOOLS_AMAP_BASE_URL:https://restapi.amap.com}
+      api-key: ${APP_TOOLS_AMAP_API_KEY:}
+      timeout: ${APP_TOOLS_AMAP_TIMEOUT:PT10S}
+      max-retries: ${APP_TOOLS_AMAP_MAX_RETRIES:2}
+      retry-backoff: ${APP_TOOLS_AMAP_RETRY_BACKOFF:500ms}
+      min-request-interval: ${APP_TOOLS_AMAP_MIN_REQUEST_INTERVAL:400ms}
+      default-city: ${APP_TOOLS_AMAP_DEFAULT_CITY:}
+      default-radius-meters: ${APP_TOOLS_AMAP_DEFAULT_RADIUS_METERS:5000}
+      max-radius-meters: ${APP_TOOLS_AMAP_MAX_RADIUS_METERS:15000}
+      default-candidate-limit: ${APP_TOOLS_AMAP_CANDIDATE_LIMIT:2}
+      max-candidate-limit: ${APP_TOOLS_AMAP_MAX_CANDIDATE_LIMIT:8}
+      route-mode: ${APP_TOOLS_AMAP_ROUTE_MODE:transit}
+      max-participants: ${APP_TOOLS_AMAP_MAX_PARTICIPANTS:8}
+      max-route-calculations: ${APP_TOOLS_AMAP_MAX_ROUTE_CALCULATIONS:80}
+      route-concurrency: ${APP_TOOLS_AMAP_ROUTE_CONCURRENCY:4}
+      score:
+        total-duration-weight: ${APP_TOOLS_AMAP_SCORE_TOTAL_DURATION_WEIGHT:0.45}
+        max-duration-weight: ${APP_TOOLS_AMAP_SCORE_MAX_DURATION_WEIGHT:0.30}
+        variance-weight: ${APP_TOOLS_AMAP_SCORE_VARIANCE_WEIGHT:0.20}
+        center-distance-weight: ${APP_TOOLS_AMAP_SCORE_CENTER_DISTANCE_WEIGHT:0.05}
   skills:
     enabled: ${APP_SKILLS_ENABLED:true}
     location-pattern: ${APP_SKILLS_LOCATION_PATTERN:classpath*:skills/*/skill.yaml}

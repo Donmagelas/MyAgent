@@ -31,13 +31,15 @@ public class ToolCallbackRegistry {
             SearchToolService searchToolService,
             WebPageFetchToolService webPageFetchToolService,
             PdfGenerateToolService pdfGenerateToolService,
-            SubagentTaskToolService subagentTaskToolService
+            SubagentTaskToolService subagentTaskToolService,
+            MeetupRecommendationToolService meetupRecommendationToolService
     ) {
         ToolCallback[] callbacks = ToolCallbacks.from(
                 searchToolService,
                 webPageFetchToolService,
                 pdfGenerateToolService,
-                subagentTaskToolService
+                subagentTaskToolService,
+                meetupRecommendationToolService
         );
         this.registeredTools = List.of(
                 buildRegisteredTool(
@@ -99,6 +101,21 @@ public class ToolCallbackRegistry {
                         Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
                         List.of("subagent", "task", "delegation"),
                         List.of("agent", "chat")
+                ),
+                buildRegisteredTool(
+                        callbacks,
+                        "recommend_meetup_place",
+                        "recommend_meetup_place",
+                        "聚会地点推荐",
+                        true,
+                        false,
+                        false,
+                        false,
+                        45_000L,
+                        ToolRiskLevel.MEDIUM,
+                        Set.of(SecurityRole.CHAT_USER, SecurityRole.KNOWLEDGE_USER, SecurityRole.KNOWLEDGE_ADMIN),
+                        List.of("map", "amap", "meetup", "poi", "route"),
+                        List.of("chat", "location", "planning")
                 )
         );
         this.toolIndex = registeredTools.stream()
