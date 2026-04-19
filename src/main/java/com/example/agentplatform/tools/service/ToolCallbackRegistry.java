@@ -17,8 +17,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 工具回调注册中心。
- * 只负责维护本地已实现的 ToolCallback，不承担数据库工具目录检索职责。
+ * 工具回调注册中心，也是当前唯一的本地工具注册源。
+ * 主 Agent 执行、工具目录同步和 Spring AI ToolCallback 兼容入口都从这里读取工具定义，避免多处重复维护。
  */
 @Component
 public class ToolCallbackRegistry {
