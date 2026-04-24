@@ -169,6 +169,12 @@ app:
       - DESIGN_DECISION
       - TASK_CONCLUSION
       - STABLE_FACT
+  cache:
+    redis:
+      enabled: ${APP_CACHE_REDIS_ENABLED:false}
+      key-prefix: ${APP_CACHE_REDIS_KEY_PREFIX:agent-platform}
+      short-term-memory-ttl: ${APP_CACHE_REDIS_SHORT_TERM_MEMORY_TTL:30m}
+      short-term-memory-version-ttl: ${APP_CACHE_REDIS_SHORT_TERM_MEMORY_VERSION_TTL:60m}
   security:
     token-ttl-hours: ${APP_SECURITY_TOKEN_TTL_HOURS:12}
     bootstrap-users:
