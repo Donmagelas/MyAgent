@@ -2,6 +2,9 @@
 
 **大模型问答、认证鉴权、Skill、RAG、工具调用、Task抽象、Workflow、执行链路追踪、记忆沉淀与可观测性、subagent** 
 
+
+![平台首页](./docs/images/overview-chat.png)
+
 ---
 
 > 这是一个基于 **Java + Spring Boot + Spring AI + PostgreSQL + pgvector** 构建的工程化单主代理平台，核心能力包括 **Agent Loop、认证鉴权、混合检索 RAG、工具调用、三层记忆、Workflow / Task、SubAgent、SSE 流式输出与执行链路可观测性**。
