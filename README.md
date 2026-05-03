@@ -1,4 +1,22 @@
-# Agent
+<div align="center">
+  <h1>MyAgent</h1>
+
+  <p>
+    <img src="https://img.shields.io/badge/Java-17-007396" alt="Java 17">
+    <img src="https://img.shields.io/badge/Spring%20Boot-3.4.5-6DB33F" alt="Spring Boot 3.4.5">
+    <img src="https://img.shields.io/badge/Spring%20AI-1.0.0-0A7EA4" alt="Spring AI 1.0.0">
+    <img src="https://img.shields.io/badge/Spring%20AI%20Alibaba-1.0.0.2-1677FF" alt="Spring AI Alibaba 1.0.0.2">
+    <img src="https://img.shields.io/badge/PostgreSQL-17.9-4169E1" alt="PostgreSQL 17.9">
+    <img src="https://img.shields.io/badge/pgvector-enabled-8A2BE2" alt="pgvector">
+    <img src="https://img.shields.io/badge/Redis-enabled-DC382D" alt="Redis">
+    <img src="https://img.shields.io/badge/Vue-3.5.32-42B883" alt="Vue 3.5.32">
+    <img src="https://img.shields.io/badge/Axios-1.15.0-5A29E4" alt="Axios 1.15.0">
+    <img src="https://img.shields.io/badge/Vite-6.4.2-646CFF" alt="Vite 6.4.2">
+  </p>
+</div>
+
+<br/>
+
 
 **大模型问答、认证鉴权、Skill、RAG、工具调用、Task抽象、Workflow、执行链路追踪、记忆沉淀与可观测性、subagent** 
 
