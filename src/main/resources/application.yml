@@ -17,11 +17,6 @@ spring:
     placeholders:
       vector_dimensions: ${APP_VECTOR_DIMENSIONS:1024}
   ai:
-    chat:
-      observations:
-        include-error-logging: true
-        log-prompt: false
-        log-completion: false
     dashscope:
       api-key: ${AI_DASHSCOPE_API_KEY:}
       chat:
