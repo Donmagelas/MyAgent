@@ -25,6 +25,8 @@ public record AgentStreamingExecutionPlan(
         List<ChatAskResponse.SourceItem> sources,
         List<RetrievedChunk> retrievedChunks,
         boolean directReturn,
-        String usageStepName
+        String usageStepName,
+        String finalAnswerModelName,
+        boolean recordFinalUsage
 ) {
 }

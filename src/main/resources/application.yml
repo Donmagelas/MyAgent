@@ -64,10 +64,12 @@ app:
       connect-timeout: ${APP_AI_CLIENT_CONNECT_TIMEOUT:PT10S}
       response-timeout: ${APP_AI_CLIENT_RESPONSE_TIMEOUT:PT30S}
   advisor:
-    forbidden-words:
-      - bomb
-      - 炸药
-      - 毒品
+    request-safety:
+      enabled: ${APP_ADVISOR_REQUEST_SAFETY_ENABLED:true}
+      temperature: ${APP_ADVISOR_REQUEST_SAFETY_TEMPERATURE:0.0}
+      max-tokens: ${APP_ADVISOR_REQUEST_SAFETY_MAX_TOKENS:256}
+      block-confidence-threshold: ${APP_ADVISOR_REQUEST_SAFETY_BLOCK_THRESHOLD:0.60}
+      refusal-message: ${APP_ADVISOR_REQUEST_SAFETY_REFUSAL_MESSAGE:我不能帮助实施危险、违法、侵害隐私、越权取数、绕过安全控制或其他可能伤害个人与社会的行为。如果你的目的是防护、合规、审计或风险分析，我可以改为提供安全建议。}
   rag:
     vector-top-k: ${APP_RAG_VECTOR_TOP_K:8}
     keyword-top-k: ${APP_RAG_KEYWORD_TOP_K:8}

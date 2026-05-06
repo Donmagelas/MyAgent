@@ -133,27 +133,38 @@ public class AgentFinalAnswerStreamService {
                 executionPlan.userId(),
                 executionPlan.conversation().id(),
                 executionPlan.answerDraft(),
-                aiModelProperties.chatModel()
+                executionPlan.finalAnswerModelName()
         );
-        var usageRecord = chatUsageService.save(
-                executionPlan.executionWorkflow().workflowId(),
-                null,
-                executionPlan.conversation().id(),
-                assistantMessage.id(),
-                executionPlan.usageStepName(),
-                springAiChatResponseMapper.toResult(
-                        null,
-                        aiModelProperties.chatModel(),
-                        executionPlan.answerDraft(),
-                        null,
-                        null,
-                        null
-                ),
-                0L,
-                true,
-                null
-        );
-        executionListener.onUsage(usageRecord);
+        ChatStreamEvent.Usage doneUsage = null;
+        if (executionPlan.recordFinalUsage()) {
+            var usageRecord = chatUsageService.save(
+                    executionPlan.executionWorkflow().workflowId(),
+                    null,
+                    executionPlan.conversation().id(),
+                    assistantMessage.id(),
+                    executionPlan.usageStepName(),
+                    springAiChatResponseMapper.toResult(
+                            null,
+                            executionPlan.finalAnswerModelName(),
+                            executionPlan.answerDraft(),
+                            null,
+                            null,
+                            null
+                    ),
+                    0L,
+                    true,
+                    null
+            );
+            executionListener.onUsage(usageRecord);
+            doneUsage = new ChatStreamEvent.Usage(
+                    usageRecord.requestId(),
+                    usageRecord.modelName(),
+                    usageRecord.promptTokens(),
+                    usageRecord.completionTokens(),
+                    usageRecord.totalTokens(),
+                    usageRecord.latencyMs()
+            );
+        }
         agentExecutionWorkflowService.completeSuccess(
                 executionPlan.userId(),
                 executionPlan.executionWorkflow(),
@@ -172,14 +183,7 @@ public class AgentFinalAnswerStreamService {
                         executionPlan.conversation().id(),
                         executionPlan.conversation().sessionId(),
                         executionPlan.answerDraft(),
-                        new ChatStreamEvent.Usage(
-                                usageRecord.requestId(),
-                                usageRecord.modelName(),
-                                usageRecord.promptTokens(),
-                                usageRecord.completionTokens(),
-                                usageRecord.totalTokens(),
-                                usageRecord.latencyMs()
-                        )
+                        doneUsage
                 ))
         );
     }

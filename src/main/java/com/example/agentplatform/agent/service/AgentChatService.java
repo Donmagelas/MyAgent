@@ -3,6 +3,7 @@ package com.example.agentplatform.agent.service;
 import com.example.agentplatform.advisor.domain.AdvisorOperation;
 import com.example.agentplatform.advisor.domain.ChatAdvisorContext;
 import com.example.agentplatform.advisor.service.ChatAdvisorExecutor;
+import com.example.agentplatform.advisor.service.RequestSafetyAdvisor;
 import com.example.agentplatform.agent.domain.AgentActionType;
 import com.example.agentplatform.agent.domain.AgentStepPlan;
 import com.example.agentplatform.agent.domain.AgentStreamingExecutionPlan;
@@ -72,6 +73,7 @@ public class AgentChatService {
     private final SkillRouterService skillRouterService;
     private final SkillToolSelector skillToolSelector;
     private final ChatAdvisorExecutor chatAdvisorExecutor;
+    private final RequestSafetyAdvisor requestSafetyAdvisor;
     private final ChatUsageService chatUsageService;
     private final SpringAiChatResponseMapper springAiChatResponseMapper;
     private final RagEvidenceGuardService ragEvidenceGuardService;
@@ -94,6 +96,7 @@ public class AgentChatService {
             SkillRouterService skillRouterService,
             SkillToolSelector skillToolSelector,
             ChatAdvisorExecutor chatAdvisorExecutor,
+            RequestSafetyAdvisor requestSafetyAdvisor,
             ChatUsageService chatUsageService,
             SpringAiChatResponseMapper springAiChatResponseMapper,
             RagEvidenceGuardService ragEvidenceGuardService,
@@ -115,6 +118,7 @@ public class AgentChatService {
         this.skillRouterService = skillRouterService;
         this.skillToolSelector = skillToolSelector;
         this.chatAdvisorExecutor = chatAdvisorExecutor;
+        this.requestSafetyAdvisor = requestSafetyAdvisor;
         this.chatUsageService = chatUsageService;
         this.springAiChatResponseMapper = springAiChatResponseMapper;
         this.ragEvidenceGuardService = ragEvidenceGuardService;
@@ -148,7 +152,6 @@ public class AgentChatService {
                 new ChatAskRequest(request.sessionId(), request.message(), null, null, null)
         );
         ChatMessage userMessage = chatPersistenceService.saveUserMessage(userId, conversation.id(), request.message());
-        MemoryContext memoryContext = memoryContextAdvisor.buildContext(userId, conversation.id(), request.message());
         AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow = agentExecutionWorkflowService.start(
                 userId,
                 conversation,
@@ -157,6 +160,25 @@ public class AgentChatService {
         executionListener.onStart(conversation.id(), conversation.sessionId(), executionWorkflow.workflowId());
         Instant startedAt = Instant.now();
         try {
+            RequestSafetyAdvisor.Evaluation safetyEvaluation = evaluateRequestSafety(
+                    request,
+                    authentication,
+                    executionWorkflow.workflowId(),
+                    conversation.id(),
+                    userMessage.id(),
+                    startedAt
+            );
+            if (safetyEvaluation.shouldBlock(resolveRequestSafetyThreshold())) {
+                return buildBlockedResponse(
+                        conversation,
+                        executionWorkflow,
+                        userId,
+                        safetyEvaluation,
+                        executionListener
+                );
+            }
+            executionListener.onLoopEntered();
+            MemoryContext memoryContext = memoryContextAdvisor.buildContext(userId, conversation.id(), request.message());
             return handleLoop(request, authentication, conversation, userMessage, memoryContext, executionWorkflow, startedAt, userId, maxSteps, executionListener);
         }
         catch (Exception exception) {
@@ -186,7 +208,6 @@ public class AgentChatService {
                 new ChatAskRequest(request.sessionId(), request.message(), null, null, null)
         );
         ChatMessage userMessage = chatPersistenceService.saveUserMessage(userId, conversation.id(), request.message());
-        MemoryContext memoryContext = memoryContextAdvisor.buildContext(userId, conversation.id(), request.message());
         AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow = agentExecutionWorkflowService.start(
                 userId,
                 conversation,
@@ -195,6 +216,26 @@ public class AgentChatService {
         executionListener.onStart(conversation.id(), conversation.sessionId(), executionWorkflow.workflowId());
 
         try {
+            Instant startedAt = Instant.now();
+            RequestSafetyAdvisor.Evaluation safetyEvaluation = evaluateRequestSafety(
+                    request,
+                    authentication,
+                    executionWorkflow.workflowId(),
+                    conversation.id(),
+                    userMessage.id(),
+                    startedAt
+            );
+            if (safetyEvaluation.shouldBlock(resolveRequestSafetyThreshold())) {
+                return buildBlockedStreamingPlan(
+                        request,
+                        conversation,
+                        executionWorkflow,
+                        userId,
+                        safetyEvaluation
+                );
+            }
+            executionListener.onLoopEntered();
+            MemoryContext memoryContext = memoryContextAdvisor.buildContext(userId, conversation.id(), request.message());
             return prepareLoopStreaming(
                     request,
                     authentication,
@@ -328,7 +369,9 @@ public class AgentChatService {
                         new ArrayList<>(sourceItems.values()),
                         new ArrayList<>(retrievedChunks.values()),
                         false,
-                        "agent-loop-final"
+                        "agent-loop-final",
+                        aiModelProperties.chatModel(),
+                        true
                 );
             }
 
@@ -410,7 +453,9 @@ public class AgentChatService {
                             new ArrayList<>(sourceItems.values()),
                             new ArrayList<>(retrievedChunks.values()),
                             true,
-                            "agent-loop-direct-return"
+                            "agent-loop-direct-return",
+                            aiModelProperties.chatModel(),
+                            true
                     );
                 }
             }
@@ -438,13 +483,136 @@ public class AgentChatService {
                             new ArrayList<>(sourceItems.values()),
                             new ArrayList<>(retrievedChunks.values()),
                             false,
-                            "agent-loop-tool-failure"
+                            "agent-loop-tool-failure",
+                            aiModelProperties.chatModel(),
+                            true
                     );
                 }
             }
         }
 
         throw new ApplicationException("Agent reached the maximum number of steps");
+    }
+
+    /**
+     * 在统一 Agent Loop 真正开始前执行请求安全判别，并把 usage 作为隐藏步骤写入日志。
+     */
+    private RequestSafetyAdvisor.Evaluation evaluateRequestSafety(
+            AgentChatRequest request,
+            Authentication authentication,
+            Long workflowId,
+            Long conversationId,
+            Long messageId,
+            Instant startedAt
+    ) {
+        RequestSafetyAdvisor.Evaluation evaluation = requestSafetyAdvisor.evaluate(new ChatAdvisorContext(
+                AdvisorOperation.AGENT_STREAM,
+                request.message(),
+                authentication
+        ));
+        if (evaluation.response() != null && evaluation.response().chatResponse() != null) {
+            chatUsageService.save(
+                    workflowId,
+                    null,
+                    conversationId,
+                    messageId,
+                    "advisor-request-safety",
+                    springAiChatResponseMapper.toResult(evaluation.response().chatResponse()),
+                    Duration.between(startedAt, Instant.now()).toMillis(),
+                    true,
+                    null
+            );
+        }
+        return evaluation;
+    }
+
+    /**
+     * 构建被安全闸门拦截后的普通对话响应。
+     * 这里仍然会保存用户消息与助手拒绝答复，保证聊天历史完整。
+     */
+    private AgentChatResponse buildBlockedResponse(
+            Conversation conversation,
+            AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow,
+            Long userId,
+            RequestSafetyAdvisor.Evaluation safetyEvaluation,
+            AgentExecutionListener executionListener
+    ) {
+        String refusalAnswer = safetyEvaluation.refusalMessage();
+        ChatMessage assistantMessage = chatPersistenceService.saveAssistantMessage(
+                userId,
+                conversation.id(),
+                refusalAnswer,
+                resolveSafetyModelName(safetyEvaluation)
+        );
+        String reasoningSummary = "请求在进入统一 Agent Loop 前被安全闸门拦截";
+        agentExecutionWorkflowService.completeSuccess(
+                userId,
+                executionWorkflow,
+                refusalAnswer,
+                reasoningSummary,
+                0,
+                List.of()
+        );
+        AgentChatResponse response = new AgentChatResponse(
+                executionWorkflow.workflowId(),
+                conversation.id(),
+                conversation.sessionId(),
+                assistantMessage.content(),
+                reasoningSummary,
+                0,
+                List.of(),
+                List.of()
+        );
+        executionListener.onFinal(response);
+        return response;
+    }
+
+    /**
+     * 构建被安全闸门拦截后的流式执行计划。
+     * 复用 direct-return 流程输出拒绝答复，但不额外记录一条伪造的最终回答 usage。
+     */
+    private AgentStreamingExecutionPlan buildBlockedStreamingPlan(
+            AgentChatRequest request,
+            Conversation conversation,
+            AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow,
+            Long userId,
+            RequestSafetyAdvisor.Evaluation safetyEvaluation
+    ) {
+        return new AgentStreamingExecutionPlan(
+                userId,
+                executionWorkflow,
+                conversation,
+                new MemoryContext(List.of(), List.of(), List.of(), ""),
+                request.message(),
+                safetyEvaluation.refusalMessage(),
+                "请求在进入统一 Agent Loop 前被安全闸门拦截",
+                0,
+                List.of(),
+                List.of(),
+                List.of(),
+                true,
+                "agent-loop-direct-return",
+                resolveSafetyModelName(safetyEvaluation),
+                false
+        );
+    }
+
+    /**
+     * 统一读取请求安全拦截阈值，避免主链硬编码。
+     */
+    private double resolveRequestSafetyThreshold() {
+        return requestSafetyAdvisor.blockConfidenceThreshold();
+    }
+
+    /**
+     * 为安全闸门生成的拒绝答复补齐模型名，优先复用实际分类调用返回的模型标识。
+     */
+    private String resolveSafetyModelName(RequestSafetyAdvisor.Evaluation safetyEvaluation) {
+        if (safetyEvaluation == null || safetyEvaluation.response() == null || safetyEvaluation.response().chatResponse() == null) {
+            return aiModelProperties.chatModel();
+        }
+        String modelName = springAiChatResponseMapper.toResult(safetyEvaluation.response().chatResponse()).modelName();
+        return modelName == null || modelName.isBlank() ? aiModelProperties.chatModel() : modelName;
     }
 
     private AgentChatResponse handleLoop(

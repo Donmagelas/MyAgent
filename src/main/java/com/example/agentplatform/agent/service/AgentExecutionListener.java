@@ -27,6 +27,12 @@ public interface AgentExecutionListener {
     }
 
     /**
+     * 当安全校验通过并真正进入统一 Agent Loop 时触发。
+     */
+    default void onLoopEntered() {
+    }
+
+    /**
      * 当某一步推理规划完成时触发。
      */
     default void onPlanning(

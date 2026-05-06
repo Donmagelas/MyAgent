@@ -1,6 +1,7 @@
 package com.example.agentplatform.chat.service;
 
 import com.example.agentplatform.common.exception.ApplicationException;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.example.agentplatform.config.AiClientProperties;
 import com.example.agentplatform.config.AiModelProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -259,6 +260,7 @@ public class DashScopeCompatibleChatCompletionClient implements ChatCompletionCl
     }
 
     /** 提供方响应载荷。 */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record ChatCompletionResponse(
             String id,
             String model,
@@ -267,6 +269,7 @@ public class DashScopeCompatibleChatCompletionClient implements ChatCompletionCl
     ) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record ChoicePayload(
             Integer index,
             ChatMessagePayload message,
@@ -275,12 +278,14 @@ public class DashScopeCompatibleChatCompletionClient implements ChatCompletionCl
     ) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record DeltaPayload(
             String role,
             String content
     ) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record UsagePayload(
             @JsonProperty("prompt_tokens") Integer promptTokens,
             @JsonProperty("completion_tokens") Integer completionTokens,

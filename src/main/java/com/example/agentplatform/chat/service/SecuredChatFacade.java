@@ -2,7 +2,7 @@ package com.example.agentplatform.chat.service;
 
 import com.example.agentplatform.advisor.domain.AdvisorOperation;
 import com.example.agentplatform.advisor.domain.ChatAdvisorContext;
-import com.example.agentplatform.advisor.service.ChatAdvisorExecutor;
+import com.example.agentplatform.advisor.service.PermissionAdvisor;
 import com.example.agentplatform.agent.dto.AgentChatRequest;
 import com.example.agentplatform.agent.service.AgentStreamService;
 import com.example.agentplatform.auth.service.AuthenticatedUserAccessor;
@@ -15,32 +15,32 @@ import reactor.core.publisher.Flux;
 
 /**
  * 带安全校验的聊天门面服务。
- * 当前仅保留前端主链使用的统一 Agent 流式入口。
+ * 当前只保留前端主链使用的统一 Agent 流式入口。
  */
 @Service
 public class SecuredChatFacade {
 
-    private final ChatAdvisorExecutor chatAdvisorExecutor;
+    private final PermissionAdvisor permissionAdvisor;
     private final AuthenticatedUserAccessor authenticatedUserAccessor;
     private final AgentStreamService agentStreamService;
 
     public SecuredChatFacade(
-            ChatAdvisorExecutor chatAdvisorExecutor,
+            PermissionAdvisor permissionAdvisor,
             AuthenticatedUserAccessor authenticatedUserAccessor,
             AgentStreamService agentStreamService
     ) {
-        this.chatAdvisorExecutor = chatAdvisorExecutor;
+        this.permissionAdvisor = permissionAdvisor;
         this.authenticatedUserAccessor = authenticatedUserAccessor;
         this.agentStreamService = agentStreamService;
     }
 
     /**
      * 执行带守卫的统一流式聊天请求。
-     * 所有公开聊天请求都会进入 Agent 流式执行链。
+     * 公开聊天请求先做认证和基础权限校验，再进入 Agent 主链。
      */
     public Flux<ServerSentEvent<ChatStreamEvent>> smartStream(ChatAskRequest request, Authentication authentication) {
         authenticatedUserAccessor.requireUserId(authentication);
-        chatAdvisorExecutor.execute(new ChatAdvisorContext(
+        permissionAdvisor.before(new ChatAdvisorContext(
                 AdvisorOperation.AGENT_STREAM,
                 request.message(),
                 authentication

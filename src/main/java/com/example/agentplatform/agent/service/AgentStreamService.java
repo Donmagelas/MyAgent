@@ -64,12 +64,25 @@ public class AgentStreamService {
                         sessionId,
                         Map.of("workflowId", workflowId)
                 )));
-                sink.next(toSse(ChatStreamEvent.step(
+                if (shouldEmitLoopInfoOnStart()) {
+                    sink.next(toSse(ChatStreamEvent.step(
                         "info",
                         conversationId,
                         sessionId,
                         "已进入统一 Agent Loop",
                         Map.of("workflowId", workflowId)
+                    )));
+                }
+            }
+
+            @Override
+            public void onLoopEntered() {
+                sink.next(toSse(ChatStreamEvent.step(
+                        "info",
+                        conversationIdRef.get(),
+                        sessionIdRef.get(),
+                        "已进入统一 Agent Loop",
+                        Map.of()
                 )));
             }
 
@@ -214,6 +227,14 @@ public class AgentStreamService {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    /**
+     * “已进入统一 Agent Loop” 的提示现在由主链路在安全闸门放行后决定是否发送。
+     * 这里默认关闭 start 阶段的旧提示，避免被安全拦截的请求出现误导性时间线。
+     */
+    private boolean shouldEmitLoopInfoOnStart() {
+        return false;
     }
 
     private Map<String, Object> buildTaskPlanMetadata(TaskPlan taskPlan) {
