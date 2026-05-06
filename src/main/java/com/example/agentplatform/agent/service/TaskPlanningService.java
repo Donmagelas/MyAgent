@@ -1,6 +1,5 @@
 package com.example.agentplatform.agent.service;
 
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.chat.service.SpringAiChatResponseMapper;
 import com.example.agentplatform.config.AgentProperties;
@@ -48,19 +47,17 @@ public class TaskPlanningService {
      * 生成结构化任务计划。
      */
     public StructuredResult<TaskPlan> plan(
-            AgentReasoningMode mode,
             String message,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools
     ) {
-        return plan(mode, message, memoryContext, availableTools, null);
+        return plan(message, memoryContext, availableTools, null);
     }
 
     /**
      * 生成带 skill 上下文的结构化任务计划。
      */
     public StructuredResult<TaskPlan> plan(
-            AgentReasoningMode mode,
             String message,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
@@ -73,7 +70,7 @@ public class TaskPlanningService {
                         .temperature(agentProperties.planning().temperature())
                         .maxTokens(agentProperties.planning().maxTokens())
                         .build())
-                .system(agentPromptService.buildTaskPlanningSystemPrompt(mode, memoryContext, availableTools, resolvedSkill)
+                .system(agentPromptService.buildTaskPlanningSystemPrompt(memoryContext, availableTools, resolvedSkill)
                         + "\n\n"
                         + outputConverter.getFormat())
                 .user(agentPromptService.buildTaskPlanningUserPrompt(message))

@@ -106,7 +106,6 @@ public class AgentFinalAnswerStreamService {
                     state.capture(chunk);
                     if (chunk.delta() != null && !chunk.delta().isBlank()) {
                         sink.next(toSse(ChatStreamEvent.delta(
-                                resolveMode(executionPlan),
                                 executionPlan.conversation().id(),
                                 executionPlan.conversation().sessionId(),
                                 chunk.delta()
@@ -165,13 +164,11 @@ public class AgentFinalAnswerStreamService {
         );
         return List.of(
                 toSse(ChatStreamEvent.delta(
-                        resolveMode(executionPlan),
                         executionPlan.conversation().id(),
                         executionPlan.conversation().sessionId(),
                         executionPlan.answerDraft()
                 )),
                 toSse(ChatStreamEvent.done(
-                        resolveMode(executionPlan),
                         executionPlan.conversation().id(),
                         executionPlan.conversation().sessionId(),
                         executionPlan.answerDraft(),
@@ -252,7 +249,6 @@ public class AgentFinalAnswerStreamService {
                 executionPlan.toolNames()
         );
         return List.of(toSse(ChatStreamEvent.done(
-                resolveMode(executionPlan),
                 executionPlan.conversation().id(),
                 executionPlan.conversation().sessionId(),
                 finalAnswer,
@@ -301,13 +297,11 @@ public class AgentFinalAnswerStreamService {
         );
         return List.of(
                 toSse(ChatStreamEvent.delta(
-                        resolveMode(executionPlan),
                         executionPlan.conversation().id(),
                         executionPlan.conversation().sessionId(),
                         fallbackAnswer
                 )),
                 toSse(ChatStreamEvent.done(
-                        resolveMode(executionPlan),
                         executionPlan.conversation().id(),
                         executionPlan.conversation().sessionId(),
                         fallbackAnswer,
@@ -327,7 +321,6 @@ public class AgentFinalAnswerStreamService {
                 throwable instanceof Exception exception ? exception : new RuntimeException(throwable)
         );
         return List.of(toSse(ChatStreamEvent.error(
-                resolveMode(executionPlan),
                 executionPlan.conversation().id(),
                 executionPlan.conversation().sessionId(),
                 throwable.getMessage()
@@ -348,14 +341,6 @@ public class AgentFinalAnswerStreamService {
         return safeAnswer == null || safeAnswer.isBlank()
                 ? ragEvidenceGuardService.buildInsufficientAnswer()
                 : safeAnswer;
-    }
-
-    private String resolveMode(AgentStreamingExecutionPlan executionPlan) {
-        return switch (executionPlan.mode()) {
-            case COT -> "agent-cot";
-            case REACT -> "agent-react";
-            case LOOP -> "agent-loop";
-        };
     }
 
     private ServerSentEvent<ChatStreamEvent> toSse(ChatStreamEvent event) {

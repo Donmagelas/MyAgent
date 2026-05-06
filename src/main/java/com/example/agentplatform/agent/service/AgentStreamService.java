@@ -1,7 +1,6 @@
 package com.example.agentplatform.agent.service;
 
 import com.example.agentplatform.agent.domain.AgentActionType;
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.AgentStreamingExecutionPlan;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.agent.dto.AgentChatRequest;
@@ -54,28 +53,19 @@ public class AgentStreamService {
     ) {
         AtomicReference<Long> conversationIdRef = new AtomicReference<>();
         AtomicReference<String> sessionIdRef = new AtomicReference<>();
-        AtomicReference<String> modeRef = new AtomicReference<>("agent");
 
         AgentExecutionListener listener = new AgentExecutionListener() {
             @Override
-            public void onStart(
-                    AgentReasoningMode mode,
-                    Long conversationId,
-                    String sessionId,
-                    Long workflowId
-            ) {
+            public void onStart(Long conversationId, String sessionId, Long workflowId) {
                 conversationIdRef.set(conversationId);
                 sessionIdRef.set(sessionId);
-                modeRef.set(resolveMode(mode));
                 sink.next(toSse(ChatStreamEvent.start(
-                        modeRef.get(),
                         conversationId,
                         sessionId,
                         Map.of("workflowId", workflowId)
                 )));
                 sink.next(toSse(ChatStreamEvent.step(
                         "info",
-                        modeRef.get(),
                         conversationId,
                         sessionId,
                         "已进入统一 Agent Loop",
@@ -89,7 +79,6 @@ public class AgentStreamService {
                         + "；步骤数=" + (taskPlan.steps() == null ? 0 : taskPlan.steps().size());
                 sink.next(toSse(ChatStreamEvent.step(
                         "task-plan",
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         content,
@@ -101,7 +90,6 @@ public class AgentStreamService {
             public void onSkillSelected(ResolvedSkill resolvedSkill, List<RegisteredTool> availableTools) {
                 sink.next(toSse(ChatStreamEvent.step(
                         "skill",
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         "已选择 skill：" + safe(resolvedSkill.skillDefinition().name()),
@@ -113,7 +101,6 @@ public class AgentStreamService {
             public void onRagRoutingDecision(AgentRagRoutingService.RagRoutingDecision decision) {
                 sink.next(toSse(ChatStreamEvent.step(
                         "rag-route",
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         buildRagRoutingContent(decision),
@@ -130,7 +117,6 @@ public class AgentStreamService {
                         + (toolName == null || toolName.isBlank() ? "" : "；工具=" + toolName);
                 sink.next(toSse(ChatStreamEvent.step(
                         "plan",
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         content,
@@ -141,14 +127,12 @@ public class AgentStreamService {
             @Override
             public void onRetrieval(int stepIndex, String query, List<ChatAskResponse.SourceItem> sources) {
                 sink.next(toSse(ChatStreamEvent.sources(
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         sources
                 )));
                 sink.next(toSse(ChatStreamEvent.step(
                         "rag",
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         "第 " + stepIndex + " 步已完成知识检索；query=" + query
@@ -168,7 +152,6 @@ public class AgentStreamService {
                         + safe(observation);
                 sink.next(toSse(ChatStreamEvent.step(
                         "observation",
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         content,
@@ -180,7 +163,6 @@ public class AgentStreamService {
             public void onEvidenceGate(int stepIndex, String reason, String stepName) {
                 sink.next(toSse(ChatStreamEvent.step(
                         "evidence-gate",
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         "第 " + stepIndex + " 步因检索证据不足被拦截，已降级为证据不足答复：" + safe(reason),
@@ -192,7 +174,6 @@ public class AgentStreamService {
             public void onJudgeDowngrade(int stepIndex, String reason, String stepName) {
                 sink.next(toSse(ChatStreamEvent.step(
                         "judge",
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         "第 " + stepIndex + " 步回答后校验未通过，已自动降级为证据不足答复：" + safe(reason),
@@ -203,7 +184,6 @@ public class AgentStreamService {
             @Override
             public void onUsage(ModelUsageRecord record) {
                 sink.next(toSse(ChatStreamEvent.usage(
-                        modeRef.get(),
                         conversationIdRef.get(),
                         sessionIdRef.get(),
                         new ChatStreamEvent.Usage(
@@ -224,21 +204,12 @@ public class AgentStreamService {
                 .flatMapMany(plan -> continueFinalStream(plan, listener))
                 .subscribe(sink::next, throwable -> {
                     sink.next(toSse(ChatStreamEvent.error(
-                            modeRef.get(),
                             conversationIdRef.get(),
                             sessionIdRef.get(),
                             throwable.getMessage()
                     )));
                     sink.complete();
                 }, sink::complete);
-    }
-
-    private String resolveMode(AgentReasoningMode mode) {
-        return switch (mode) {
-            case COT -> "agent-cot";
-            case REACT -> "agent-react";
-            case LOOP -> "agent-loop";
-        };
     }
 
     private String safe(String value) {

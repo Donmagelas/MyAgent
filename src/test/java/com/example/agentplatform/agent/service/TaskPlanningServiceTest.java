@@ -1,6 +1,5 @@
 package com.example.agentplatform.agent.service;
 
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.chat.service.DirectPromptService;
 import com.example.agentplatform.chat.service.SpringAiChatResponseMapper;
@@ -27,7 +26,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * 任务规划服务测试。
- * 验证结构化输出能够被正确转换为 TaskPlan。
+ * 验证统一 Loop 主链下的结构化 TaskPlan 输出能够被正确转换。
  */
 class TaskPlanningServiceTest {
 
@@ -42,8 +41,6 @@ class TaskPlanningServiceTest {
 
         AgentProperties agentProperties = new AgentProperties(
                 true,
-                AgentReasoningMode.COT,
-                new AgentProperties.Cot(0.0, 512),
                 new AgentProperties.Planning(true, 0.0, 768),
                 new AgentProperties.Loop(6, 0.0, 512),
                 new AgentProperties.Subagent(true, 4, true, 2, 2, List.of("search_web", "fetch_webpage"))
@@ -67,9 +64,9 @@ class TaskPlanningServiceTest {
                     .extracting(message -> message.getMessageType())
                     .contains(MessageType.SYSTEM, MessageType.USER);
             assertThat(prompt.getInstructions().stream().filter(SystemMessage.class::isInstance).findFirst().orElseThrow().getText())
-                    .contains("结构化任务计划");
+                    .contains("task planner");
             assertThat(prompt.getInstructions().stream().filter(UserMessage.class::isInstance).findFirst().orElseThrow().getText())
-                    .contains("用户目标");
+                    .contains("User request");
             return new ChatResponse(List.of(new Generation(new AssistantMessage("""
                     {
                       "goal": "生成检索增强方案",
@@ -99,7 +96,6 @@ class TaskPlanningServiceTest {
         });
 
         TaskPlanningService.StructuredResult<TaskPlan> result = taskPlanningService.plan(
-                AgentReasoningMode.REACT,
                 "请帮我生成检索增强方案",
                 new MemoryContext(List.of(), List.of(), List.of(), ""),
                 List.of()

@@ -247,7 +247,6 @@ app:
       max-tokens: ${APP_SKILLS_ROUTE_MAX_TOKENS:256}
   agent:
     enabled: ${APP_AGENT_ENABLED:true}
-    default-mode: ${APP_AGENT_DEFAULT_MODE:LOOP}
     rag-routing:
       enabled: ${APP_AGENT_RAG_ROUTING_ENABLED:true}
       min-query-length: ${APP_AGENT_RAG_ROUTING_MIN_QUERY_LENGTH:4}
@@ -352,9 +351,6 @@ app:
         - 写一篇
         - 起标题
         - 总结这段
-    cot:
-      temperature: ${APP_AGENT_COT_TEMPERATURE:0.0}
-      max-tokens: ${APP_AGENT_COT_MAX_TOKENS:512}
     planning:
       enabled: ${APP_AGENT_PLANNING_ENABLED:true}
       temperature: ${APP_AGENT_PLANNING_TEMPERATURE:0.0}

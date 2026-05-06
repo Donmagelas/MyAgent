@@ -1,6 +1,5 @@
 package com.example.agentplatform.chat.controller;
 
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.auth.service.AuthenticatedUserAccessor;
 import com.example.agentplatform.chat.dto.ChatAskRequest;
 import com.example.agentplatform.chat.dto.ChatStreamEvent;
@@ -28,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * ChatController 主链流式接口 WebFlux 测试。
- * 验证 /api/chat/stream 仍能走统一 Agent 流式入口。
+ * 验证 /api/chat/stream 始终走统一 Agent Loop 入口。
  */
 @WebFluxTest(
         controllers = ChatController.class,
@@ -37,7 +36,7 @@ import static org.mockito.Mockito.when;
                 ReactiveUserDetailsServiceAutoConfiguration.class
         }
 )
-class ChatControllerAgentModeWebFluxTest {
+class ChatControllerAgentStreamWebFluxTest {
 
     @Autowired
     private WebTestClient webTestClient;
@@ -54,9 +53,15 @@ class ChatControllerAgentModeWebFluxTest {
     @Test
     void shouldSupportUnifiedAgentStreamOnChatStream() {
         when(securedChatFacade.smartStream(any(), any())).thenReturn(Flux.just(
-                toSse(ChatStreamEvent.start("agent-react", 301L, "chat-agent-stream", Map.of("workflowId", 401L))),
-                toSse(ChatStreamEvent.step("plan", "agent-react", 301L, "chat-agent-stream", "第 1 步推理：调用 generate_pdf", Map.of("step", 1, "toolName", "generate_pdf"))),
-                toSse(ChatStreamEvent.done("agent-react", 301L, "chat-agent-stream", "PDF generated", null))
+                toSse(ChatStreamEvent.start(301L, "chat-agent-stream", Map.of("workflowId", 401L))),
+                toSse(ChatStreamEvent.step(
+                        "plan",
+                        301L,
+                        "chat-agent-stream",
+                        "第 1 步推理：调用 generate_pdf",
+                        Map.of("step", 1, "toolName", "generate_pdf")
+                )),
+                toSse(ChatStreamEvent.done(301L, "chat-agent-stream", "PDF generated", null))
         ));
 
         FluxExchangeResult<ChatStreamEvent> result = webTestClient.post()
@@ -86,7 +91,7 @@ class ChatControllerAgentModeWebFluxTest {
     @Test
     void shouldForwardFullRequestBodyToSecuredAgentStream() {
         when(securedChatFacade.smartStream(any(), any())).thenReturn(Flux.just(
-                toSse(ChatStreamEvent.done("agent-loop", 302L, "chat-agent-forward", "ok", null))
+                toSse(ChatStreamEvent.done(302L, "chat-agent-forward", "ok", null))
         ));
 
         webTestClient.post()
@@ -97,7 +102,6 @@ class ChatControllerAgentModeWebFluxTest {
                         {
                           "sessionId": "chat-agent-forward",
                           "message": "请优先基于刚上传的知识文档回答",
-                          "agentMode": "LOOP",
                           "agentMaxSteps": 20,
                           "preferKnowledgeRetrieval": true,
                           "knowledgeDocumentHint": "delta_force.md"
@@ -114,7 +118,6 @@ class ChatControllerAgentModeWebFluxTest {
 
         org.assertj.core.api.Assertions.assertThat(capturedRequest.sessionId()).isEqualTo("chat-agent-forward");
         org.assertj.core.api.Assertions.assertThat(capturedRequest.message()).isEqualTo("请优先基于刚上传的知识文档回答");
-        org.assertj.core.api.Assertions.assertThat(capturedRequest.agentMode()).isEqualTo(AgentReasoningMode.LOOP);
         org.assertj.core.api.Assertions.assertThat(capturedRequest.agentMaxSteps()).isEqualTo(20);
         org.assertj.core.api.Assertions.assertThat(capturedRequest.preferKnowledgeRetrieval()).isTrue();
         org.assertj.core.api.Assertions.assertThat(capturedRequest.knowledgeDocumentHint()).isEqualTo("delta_force.md");

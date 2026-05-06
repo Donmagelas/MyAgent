@@ -62,7 +62,7 @@ class ObservabilityControllerWebFluxTest {
                 Map.of("conversationId", 201L),
                 Map.of(),
                 null,
-                Map.of("mode", "REACT"),
+                Map.of(),
                 Map.of("RUNNING", 1L, "COMPLETED", 2L),
                 new WorkflowCurrentStepView(3L, "工具执行 1", "AGENT_TOOL", TaskStatus.RUNNING, 50, OffsetDateTime.now()),
                 new UsageSummaryView(2L, 2L, 0L, 25, 45, 70, 2500L, List.of(), List.of()),

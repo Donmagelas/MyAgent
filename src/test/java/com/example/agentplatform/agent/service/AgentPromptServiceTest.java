@@ -1,6 +1,5 @@
 package com.example.agentplatform.agent.service;
 
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.agent.domain.TaskPlanStep;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
@@ -23,7 +22,7 @@ import static org.mockito.Mockito.mock;
 
 /**
  * AgentPromptService 提示词测试。
- * 用于验证关键 prompt 不会再次出现乱码或明显退化。
+ * 用于验证关键 prompt 没有退化，也不会再依赖旧模式参数。
  */
 class AgentPromptServiceTest {
 
@@ -34,7 +33,6 @@ class AgentPromptServiceTest {
     @Test
     void shouldBuildStableTaskPlanningPrompt() {
         String prompt = agentPromptService.buildTaskPlanningSystemPrompt(
-                AgentReasoningMode.LOOP,
                 new MemoryContext(List.of(), List.of(), List.of(), ""),
                 List.of(buildTaskTool())
         );
@@ -43,7 +41,8 @@ class AgentPromptServiceTest {
                 .contains("You are the task planner for an enterprise Agent workflow.")
                 .contains("The task tool is available.")
                 .contains("Available tools:")
-                .doesNotContain(CORRUPTED_PLACEHOLDER);
+                .doesNotContain(CORRUPTED_PLACEHOLDER)
+                .doesNotContain("Current reasoning mode");
     }
 
     @Test
@@ -63,7 +62,6 @@ class AgentPromptServiceTest {
         );
 
         String prompt = agentPromptService.buildLoopPlannerSystemPrompt(
-                AgentReasoningMode.LOOP,
                 new MemoryContext(List.of(), List.of(), List.of(), ""),
                 List.of(buildTaskTool()),
                 taskPlan
@@ -75,7 +73,8 @@ class AgentPromptServiceTest {
                 .contains("Do not wait for the user to explicitly say \"use the knowledge base\" before choosing RAG.")
                 .contains("Subagent guidance:")
                 .contains("goal: Research the document")
-                .doesNotContain(CORRUPTED_PLACEHOLDER);
+                .doesNotContain(CORRUPTED_PLACEHOLDER)
+                .doesNotContain("Current reasoning mode");
     }
 
     @Test
@@ -99,7 +98,6 @@ class AgentPromptServiceTest {
         );
 
         String prompt = agentPromptService.buildLoopPlannerSystemPrompt(
-                AgentReasoningMode.LOOP,
                 new MemoryContext(List.of(), List.of(), List.of(), ""),
                 List.of(buildTaskTool()),
                 null,

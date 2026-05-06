@@ -1,7 +1,6 @@
 package com.example.agentplatform.agent.service;
 
 import com.example.agentplatform.agent.domain.AgentActionType;
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.agent.domain.TaskPlanStep;
 import com.example.agentplatform.chat.domain.Conversation;
@@ -22,7 +21,7 @@ import java.util.Map;
 
 /**
  * Agent 执行工作流跟踪服务。
- * 把一次 CoT、ReAct 或 Agent Loop 执行过程映射成 workflow 和步骤任务，便于复用已有任务体系。
+ * 把一次统一 Agent Loop 执行过程映射成 workflow 和步骤任务，便于复用已有任务体系。
  */
 @Service
 public class AgentExecutionWorkflowService {
@@ -43,15 +42,14 @@ public class AgentExecutionWorkflowService {
     public ExecutionWorkflow start(
             Long userId,
             Conversation conversation,
-            String message,
-            AgentReasoningMode mode
+            String message
     ) {
         var workflow = workflowService.create(userId, new WorkflowCreateRequest(
                 "Agent Execution Workflow",
                 "Agent 推理与工具执行工作流",
                 true,
                 buildWorkflowInput(conversation, message),
-                buildWorkflowMetadata(conversation, mode),
+                buildWorkflowMetadata(conversation),
                 List.of(new WorkflowTaskCreateRequest(
                         ROOT_TASK_KEY,
                         null,
@@ -63,7 +61,7 @@ public class AgentExecutionWorkflowService {
                         "conversation",
                         String.valueOf(conversation.id()),
                         buildRootInput(message),
-                        Map.of("mode", mode.name())
+                        Map.of()
                 ))
         ));
         TaskRecord rootTask = workflowService.listTasks(userId, workflow.id()).stream()
@@ -73,10 +71,10 @@ public class AgentExecutionWorkflowService {
         TaskRecord runningRootTask = taskService.updateStatus(userId, rootTask.id(), new TaskStatusUpdateRequest(
                 TaskStatus.RUNNING,
                 0,
-                Map.of("mode", mode.name()),
+                Map.of(),
                 null
         ));
-        return new ExecutionWorkflow(workflow.id(), runningRootTask.id(), mode);
+        return new ExecutionWorkflow(workflow.id(), runningRootTask.id());
     }
 
     /**
@@ -99,7 +97,7 @@ public class AgentExecutionWorkflowService {
                 "记录当前一步的推理与决策",
                 "AGENT_REASON",
                 Map.of("step", stepIndex),
-                Map.of("mode", executionWorkflow.mode().name())
+                Map.of()
         );
         taskService.updateStatus(userId, task.id(), new TaskStatusUpdateRequest(
                 TaskStatus.COMPLETED,
@@ -129,7 +127,7 @@ public class AgentExecutionWorkflowService {
                 "记录 Agent 在执行前生成的结构化任务计划",
                 "AGENT_PLAN",
                 buildTaskPlanInput(taskPlan),
-                Map.of("mode", executionWorkflow.mode().name())
+                Map.of()
         );
         taskService.updateStatus(userId, planTask.id(), new TaskStatusUpdateRequest(
                 TaskStatus.COMPLETED,
@@ -151,7 +149,7 @@ public class AgentExecutionWorkflowService {
                     "记录任务计划中的单个步骤",
                     "AGENT_PLAN_STEP",
                     buildTaskPlanStepInput(index + 1, step),
-                    Map.of("mode", executionWorkflow.mode().name())
+                    Map.of()
             );
             taskService.updateStatus(userId, stepTask.id(), new TaskStatusUpdateRequest(
                     TaskStatus.COMPLETED,
@@ -182,7 +180,7 @@ public class AgentExecutionWorkflowService {
                 "记录 Agent 选择的工具调用",
                 "AGENT_TOOL",
                 buildToolInput(stepIndex, toolName, toolInput),
-                Map.of("mode", executionWorkflow.mode().name())
+                Map.of()
         );
         taskService.updateStatus(userId, toolTask.id(), new TaskStatusUpdateRequest(
                 TaskStatus.COMPLETED,
@@ -203,7 +201,7 @@ public class AgentExecutionWorkflowService {
                 "记录工具调用后的 observation",
                 "AGENT_OBSERVATION",
                 Map.of("step", stepIndex, "toolName", toolName),
-                Map.of("mode", executionWorkflow.mode().name())
+                Map.of()
         );
         taskService.updateStatus(userId, observationTask.id(), new TaskStatusUpdateRequest(
                 TaskStatus.COMPLETED,
@@ -239,7 +237,7 @@ public class AgentExecutionWorkflowService {
                         "step", stepIndex,
                         "ragQuery", ragQuery
                 ),
-                Map.of("mode", executionWorkflow.mode().name())
+                Map.of()
         );
         taskService.updateStatus(userId, retrievalTask.id(), new TaskStatusUpdateRequest(
                 TaskStatus.COMPLETED,
@@ -260,7 +258,7 @@ public class AgentExecutionWorkflowService {
                 "记录 RAG 检索返回的观察结果",
                 "AGENT_OBSERVATION",
                 Map.of("step", stepIndex, "ragQuery", ragQuery),
-                Map.of("mode", executionWorkflow.mode().name())
+                Map.of()
         );
         taskService.updateStatus(userId, observationTask.id(), new TaskStatusUpdateRequest(
                 TaskStatus.COMPLETED,
@@ -291,7 +289,7 @@ public class AgentExecutionWorkflowService {
                 "记录当前一步的 observation",
                 "AGENT_OBSERVATION",
                 Map.of("step", stepIndex),
-                Map.of("mode", executionWorkflow.mode().name())
+                Map.of()
         );
         taskService.updateStatus(userId, task.id(), new TaskStatusUpdateRequest(
                 TaskStatus.COMPLETED,
@@ -383,7 +381,7 @@ public class AgentExecutionWorkflowService {
                 taskType,
                 0,
                 "agent",
-                executionWorkflow.mode().name(),
+                "agent-loop",
                 input,
                 metadata,
                 List.of()
@@ -404,9 +402,8 @@ public class AgentExecutionWorkflowService {
         return input;
     }
 
-    private Map<String, Object> buildWorkflowMetadata(Conversation conversation, AgentReasoningMode mode) {
+    private Map<String, Object> buildWorkflowMetadata(Conversation conversation) {
         Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("mode", mode.name());
         metadata.put("conversationId", conversation.id());
         metadata.put("sessionId", conversation.sessionId());
         return metadata;
@@ -504,8 +501,7 @@ public class AgentExecutionWorkflowService {
      */
     public record ExecutionWorkflow(
             Long workflowId,
-            Long rootTaskId,
-            AgentReasoningMode mode
+            Long rootTaskId
     ) {
     }
 }

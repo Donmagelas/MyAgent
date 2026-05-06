@@ -17,7 +17,6 @@ public record AgentStreamingExecutionPlan(
         AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow,
         Conversation conversation,
         MemoryContext memoryContext,
-        AgentReasoningMode mode,
         String originalMessage,
         String answerDraft,
         String reasoningSummary,

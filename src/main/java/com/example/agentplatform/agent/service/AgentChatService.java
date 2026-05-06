@@ -4,8 +4,6 @@ import com.example.agentplatform.advisor.domain.AdvisorOperation;
 import com.example.agentplatform.advisor.domain.ChatAdvisorContext;
 import com.example.agentplatform.advisor.service.ChatAdvisorExecutor;
 import com.example.agentplatform.agent.domain.AgentActionType;
-import com.example.agentplatform.agent.domain.AgentCotResult;
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.AgentStepPlan;
 import com.example.agentplatform.agent.domain.AgentStreamingExecutionPlan;
 import com.example.agentplatform.agent.domain.TaskPlan;
@@ -53,7 +51,7 @@ import java.util.Set;
 
 /**
  * Agent 对话服务。
- * 统一承载 CoT、ReAct 和 Agent Loop，并在默认情况下把 RAG、工具和子任务决策都放进同一个 loop 中。
+ * 统一承载 Agent Loop，并在默认情况下把 RAG、工具和子任务决策都放进同一个 loop 中。
  */
 @Service
 public class AgentChatService {
@@ -144,27 +142,22 @@ public class AgentChatService {
             throw new ApplicationException("Agent is disabled");
         }
         Long userId = authenticatedUserAccessor.requireUserId(authentication);
-        AgentReasoningMode mode = resolveMode(request);
         int maxSteps = resolveMaxSteps(request);
         Conversation conversation = chatPersistenceService.getOrCreateConversation(
                 userId,
-                new ChatAskRequest(request.sessionId(), request.message(), null, null)
+                new ChatAskRequest(request.sessionId(), request.message(), null, null, null)
         );
         ChatMessage userMessage = chatPersistenceService.saveUserMessage(userId, conversation.id(), request.message());
         MemoryContext memoryContext = memoryContextAdvisor.buildContext(userId, conversation.id(), request.message());
         AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow = agentExecutionWorkflowService.start(
                 userId,
                 conversation,
-                request.message(),
-                mode
+                request.message()
         );
-        executionListener.onStart(mode, conversation.id(), conversation.sessionId(), executionWorkflow.workflowId());
+        executionListener.onStart(conversation.id(), conversation.sessionId(), executionWorkflow.workflowId());
         Instant startedAt = Instant.now();
         try {
-            return switch (mode) {
-                case COT -> handleCot(request, conversation, userMessage, memoryContext, executionWorkflow, startedAt, userId, executionListener);
-                case REACT, LOOP -> handleLoop(request, authentication, conversation, userMessage, memoryContext, executionWorkflow, startedAt, userId, mode, maxSteps, executionListener);
-            };
+            return handleLoop(request, authentication, conversation, userMessage, memoryContext, executionWorkflow, startedAt, userId, maxSteps, executionListener);
         }
         catch (Exception exception) {
             executionListener.onError(exception);
@@ -187,107 +180,38 @@ public class AgentChatService {
             throw new ApplicationException("Agent is disabled");
         }
         Long userId = authenticatedUserAccessor.requireUserId(authentication);
-        AgentReasoningMode mode = resolveMode(request);
         int maxSteps = resolveMaxSteps(request);
         Conversation conversation = chatPersistenceService.getOrCreateConversation(
                 userId,
-                new ChatAskRequest(request.sessionId(), request.message(), null, null)
+                new ChatAskRequest(request.sessionId(), request.message(), null, null, null)
         );
         ChatMessage userMessage = chatPersistenceService.saveUserMessage(userId, conversation.id(), request.message());
         MemoryContext memoryContext = memoryContextAdvisor.buildContext(userId, conversation.id(), request.message());
         AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow = agentExecutionWorkflowService.start(
                 userId,
                 conversation,
-                request.message(),
-                mode
+                request.message()
         );
-        executionListener.onStart(mode, conversation.id(), conversation.sessionId(), executionWorkflow.workflowId());
+        executionListener.onStart(conversation.id(), conversation.sessionId(), executionWorkflow.workflowId());
 
         try {
-            return switch (mode) {
-                case COT -> prepareCotStreaming(
-                        request,
-                        conversation,
-                        userMessage,
-                        memoryContext,
-                        executionWorkflow,
-                        userId,
-                        executionListener
-                );
-                case REACT, LOOP -> prepareLoopStreaming(
-                        request,
-                        authentication,
-                        conversation,
-                        userMessage,
-                        memoryContext,
-                        executionWorkflow,
-                        userId,
-                        mode,
-                        maxSteps,
-                        executionListener
-                );
-            };
+            return prepareLoopStreaming(
+                    request,
+                    authentication,
+                    conversation,
+                    userMessage,
+                    memoryContext,
+                    executionWorkflow,
+                    userId,
+                    maxSteps,
+                    executionListener
+            );
         }
         catch (Exception exception) {
             executionListener.onError(exception);
             agentExecutionWorkflowService.completeFailure(userId, executionWorkflow, 0, exception);
             throw exception;
         }
-    }
-
-    private AgentStreamingExecutionPlan prepareCotStreaming(
-            AgentChatRequest request,
-            Conversation conversation,
-            ChatMessage userMessage,
-            MemoryContext memoryContext,
-            AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow,
-            Long userId,
-            AgentExecutionListener executionListener
-    ) {
-        Instant startedAt = Instant.now();
-        AgentStepPlannerService.StructuredResult<AgentCotResult> result = agentStepPlannerService.planCot(
-                buildInternalPlannerMessage(request),
-                memoryContext
-        );
-        recordUsage(
-                executionWorkflow.workflowId(),
-                conversation.id(),
-                userMessage.id(),
-                "agent-cot-plan",
-                result,
-                startedAt,
-                executionListener
-        );
-        AgentCotResult body = result.body();
-        if (body == null || body.finalAnswer() == null || body.finalAnswer().isBlank()) {
-            throw new ApplicationException("CoT result is missing finalAnswer");
-        }
-        agentExecutionWorkflowService.recordPlanningStep(
-                userId,
-                executionWorkflow,
-                1,
-                body.reasoningSummary(),
-                AgentActionType.FINAL,
-                null,
-                body.finalAnswer()
-        );
-        executionListener.onPlanning(1, body.reasoningSummary(), AgentActionType.FINAL, null);
-        return new AgentStreamingExecutionPlan(
-                userId,
-                executionWorkflow,
-                conversation,
-                memoryContext,
-                AgentReasoningMode.COT,
-                request.message(),
-                body.finalAnswer(),
-                body.reasoningSummary(),
-                1,
-                List.of(),
-                List.of(),
-                List.of(),
-                false,
-                "agent-cot-final"
-        );
     }
 
     private AgentStreamingExecutionPlan prepareLoopStreaming(
@@ -298,7 +222,6 @@ public class AgentChatService {
             MemoryContext memoryContext,
             AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow,
             Long userId,
-            AgentReasoningMode mode,
             int maxSteps,
             AgentExecutionListener executionListener
     ) {
@@ -314,7 +237,6 @@ public class AgentChatService {
         TaskPlan taskPlan = buildTaskPlan(
                 request,
                 executionWorkflow.workflowId(),
-                mode,
                 buildInternalPlannerMessage(request),
                 memoryContext,
                 availableTools,
@@ -337,7 +259,6 @@ public class AgentChatService {
 
         for (int stepIndex = 1; stepIndex <= maxSteps; stepIndex++) {
             AgentStepPlannerService.StructuredResult<AgentStepPlan> result = agentStepPlannerService.planNextStep(
-                    mode,
                     buildInternalPlannerMessage(request),
                     memoryContext,
                     availableTools,
@@ -399,7 +320,6 @@ public class AgentChatService {
                         executionWorkflow,
                         conversation,
                         memoryContext,
-                        mode,
                         request.message(),
                         finalAnswer,
                         buildLoopReasoningSummary(executedSteps, usedTools, sourceItems.values()),
@@ -482,7 +402,6 @@ public class AgentChatService {
                             executionWorkflow,
                             conversation,
                             memoryContext,
-                            mode,
                             request.message(),
                             observation,
                             buildLoopReasoningSummary(executedSteps, usedTools, sourceItems.values()),
@@ -511,7 +430,6 @@ public class AgentChatService {
                             executionWorkflow,
                             conversation,
                             memoryContext,
-                            mode,
                             request.message(),
                             buildNonRetryableToolFailureAnswer(stepPlan.toolName(), exception),
                             buildLoopReasoningSummary(executedSteps, usedTools, sourceItems.values()),
@@ -529,81 +447,6 @@ public class AgentChatService {
         throw new ApplicationException("Agent reached the maximum number of steps");
     }
 
-    private AgentChatResponse handleCot(
-            AgentChatRequest request,
-            Conversation conversation,
-            ChatMessage userMessage,
-            MemoryContext memoryContext,
-            AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow,
-            Instant startedAt,
-            Long userId,
-            AgentExecutionListener executionListener
-    ) {
-        AgentStepPlannerService.StructuredResult<AgentCotResult> result = agentStepPlannerService.planCot(
-                buildInternalPlannerMessage(request),
-                memoryContext
-        );
-        recordUsage(
-                executionWorkflow.workflowId(),
-                conversation.id(),
-                userMessage.id(),
-                "agent-cot-plan",
-                result,
-                startedAt,
-                executionListener
-        );
-        AgentCotResult body = result.body();
-        if (body == null || body.finalAnswer() == null || body.finalAnswer().isBlank()) {
-            throw new ApplicationException("CoT result is missing finalAnswer");
-        }
-        agentExecutionWorkflowService.recordPlanningStep(
-                userId,
-                executionWorkflow,
-                1,
-                body.reasoningSummary(),
-                AgentActionType.FINAL,
-                null,
-                body.finalAnswer()
-        );
-        executionListener.onPlanning(1, body.reasoningSummary(), AgentActionType.FINAL, null);
-        ChatMessage assistantMessage = chatPersistenceService.saveAssistantMessage(
-                userId,
-                conversation.id(),
-                body.finalAnswer(),
-                resolveModelName(result)
-        );
-        recordUsage(
-                executionWorkflow.workflowId(),
-                conversation.id(),
-                assistantMessage.id(),
-                "agent-cot-final",
-                result,
-                startedAt,
-                executionListener
-        );
-        agentExecutionWorkflowService.completeSuccess(
-                userId,
-                executionWorkflow,
-                body.finalAnswer(),
-                body.reasoningSummary(),
-                1,
-                List.of()
-        );
-        AgentChatResponse response = new AgentChatResponse(
-                executionWorkflow.workflowId(),
-                conversation.id(),
-                conversation.sessionId(),
-                AgentReasoningMode.COT,
-                body.finalAnswer(),
-                body.reasoningSummary(),
-                1,
-                List.of(),
-                List.of()
-        );
-        executionListener.onFinal(response);
-        return response;
-    }
-
     private AgentChatResponse handleLoop(
             AgentChatRequest request,
             Authentication authentication,
@@ -613,7 +456,6 @@ public class AgentChatService {
             AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow,
             Instant startedAt,
             Long userId,
-            AgentReasoningMode mode,
             int maxSteps,
             AgentExecutionListener executionListener
     ) {
@@ -628,7 +470,6 @@ public class AgentChatService {
         TaskPlan taskPlan = buildTaskPlan(
                 request,
                 executionWorkflow.workflowId(),
-                mode,
                 buildInternalPlannerMessage(request),
                 memoryContext,
                 availableTools,
@@ -651,7 +492,6 @@ public class AgentChatService {
 
         for (int stepIndex = 1; stepIndex <= maxSteps; stepIndex++) {
             AgentStepPlannerService.StructuredResult<AgentStepPlan> result = agentStepPlannerService.planNextStep(
-                    mode,
                     buildInternalPlannerMessage(request),
                     memoryContext,
                     availableTools,
@@ -748,7 +588,6 @@ public class AgentChatService {
                         executionWorkflow.workflowId(),
                         conversation.id(),
                         conversation.sessionId(),
-                        mode,
                         finalAnswer,
                         reasoningSummary,
                         executedSteps,
@@ -862,7 +701,6 @@ public class AgentChatService {
                             executionWorkflow.workflowId(),
                             conversation.id(),
                             conversation.sessionId(),
-                            mode,
                             observation,
                             reasoningSummary,
                             executedSteps,
@@ -904,7 +742,6 @@ public class AgentChatService {
                             executionWorkflow.workflowId(),
                             conversation.id(),
                             conversation.sessionId(),
-                            mode,
                             assistantMessage.content(),
                             reasoningSummary,
                             executedSteps,
@@ -950,7 +787,6 @@ public class AgentChatService {
     private TaskPlan buildTaskPlan(
             AgentChatRequest request,
             Long workflowId,
-            AgentReasoningMode mode,
             String message,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
@@ -960,13 +796,11 @@ public class AgentChatService {
             Instant startedAt,
             AgentExecutionListener executionListener
     ) {
-        if (mode == AgentReasoningMode.COT
-                || agentProperties.planning() == null
+        if (agentProperties.planning() == null
                 || !agentProperties.planning().enabled()) {
             return null;
         }
         TaskPlanningService.StructuredResult<TaskPlan> result = taskPlanningService.plan(
-                mode,
                 message,
                 memoryContext,
                 availableTools,
@@ -982,13 +816,6 @@ public class AgentChatService {
                 executionListener
         );
         return result.body();
-    }
-
-    private AgentReasoningMode resolveMode(AgentChatRequest request) {
-        if (request.mode() != null) {
-            return request.mode();
-        }
-        return agentProperties.defaultMode() == null ? AgentReasoningMode.LOOP : agentProperties.defaultMode();
     }
 
     private int resolveMaxSteps(AgentChatRequest request) {

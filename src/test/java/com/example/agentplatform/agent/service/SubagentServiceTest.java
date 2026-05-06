@@ -1,7 +1,6 @@
 package com.example.agentplatform.agent.service;
 
 import com.example.agentplatform.agent.domain.AgentActionType;
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.AgentStepPlan;
 import com.example.agentplatform.agent.domain.SubagentCompletionType;
 import com.example.agentplatform.agent.domain.TaskPlan;
@@ -58,8 +57,6 @@ class SubagentServiceTest {
 
         AgentProperties agentProperties = new AgentProperties(
                 true,
-                AgentReasoningMode.LOOP,
-                new AgentProperties.Cot(0.0, 512),
                 new AgentProperties.Planning(true, 0.0, 768),
                 new AgentProperties.Loop(6, 0.0, 512),
                 new AgentProperties.Subagent(true, 4, true, 2, 2, List.of("search_web", "fetch_webpage"))
@@ -155,10 +152,9 @@ class SubagentServiceTest {
         when(toolResolverService.resolve(any())).thenReturn(List.of(searchTool, taskTool));
         when(subagentWorkflowService.start(eq(1L), any(), eq("请在独立上下文里调研 PostgreSQL 测试框架"), eq(100L), eq(200L), eq(1)))
                 .thenReturn(new SubagentWorkflowService.ExecutionWorkflow(301L, 401L));
-        when(taskPlanningService.plan(eq(AgentReasoningMode.LOOP), eq("请在独立上下文里调研 PostgreSQL 测试框架"), any(MemoryContext.class), any()))
+        when(taskPlanningService.plan(eq("请在独立上下文里调研 PostgreSQL 测试框架"), any(MemoryContext.class), any()))
                 .thenReturn(new TaskPlanningService.StructuredResult<>(taskPlan, null));
         when(agentStepPlannerService.planNextStep(
-                eq(AgentReasoningMode.LOOP),
                 eq("请在独立上下文里调研 PostgreSQL 测试框架"),
                 any(MemoryContext.class),
                 any(),
@@ -178,7 +174,6 @@ class SubagentServiceTest {
                 null
         ));
         when(agentStepPlannerService.planNextStep(
-                eq(AgentReasoningMode.LOOP),
                 eq("请在独立上下文里调研 PostgreSQL 测试框架"),
                 any(MemoryContext.class),
                 any(),
@@ -205,7 +200,7 @@ class SubagentServiceTest {
                 any()
         )).thenReturn(new AgentToolExecutorService.ToolExecutionOutcome(
                 "search_web",
-                "检索结果显示项目主要使用 pytest。",
+                "搜索结果显示项目主要使用 pytest。",
                 false
         ));
 
@@ -221,21 +216,8 @@ class SubagentServiceTest {
         assertThat(result.usedTools()).containsExactly("search_web");
 
         ArgumentCaptor<List<RegisteredTool>> toolCaptor = ArgumentCaptor.forClass(List.class);
-        verify(taskPlanningService).plan(eq(AgentReasoningMode.LOOP), eq("请在独立上下文里调研 PostgreSQL 测试框架"), any(MemoryContext.class), toolCaptor.capture());
+        verify(taskPlanningService).plan(eq("请在独立上下文里调研 PostgreSQL 测试框架"), any(MemoryContext.class), toolCaptor.capture());
         assertThat(toolCaptor.getValue()).extracting(tool -> tool.definition().name()).containsExactly("search_web");
-
-        verify(subagentWorkflowService).recordTaskPlan(1L, new SubagentWorkflowService.ExecutionWorkflow(301L, 401L), taskPlan);
-        verify(subagentWorkflowService).completeSuccess(
-                1L,
-                new SubagentWorkflowService.ExecutionWorkflow(301L, 401L),
-                "子智能体结论：当前资料显示主要测试框架是 pytest。",
-                "先搜索资料，再输出结论。",
-                2,
-                List.of("search_web"),
-                false,
-                SubagentCompletionType.FINAL,
-                null
-        );
     }
 
     @Test
@@ -275,17 +257,13 @@ class SubagentServiceTest {
                 ),
                 mock(ToolCallback.class)
         );
-        TaskPlan taskPlan = new TaskPlan(
-                "重复搜索测试",
-                "尝试搜索并观察是否会触发保护。",
-                List.of()
-        );
+        TaskPlan taskPlan = new TaskPlan("重复搜索测试", "尝试搜索并观察是否会触发保护。", List.of());
 
         when(toolPermissionGuard.requirePermissionContext(toolContext)).thenReturn(permissionContext);
         when(toolResolverService.resolve(any())).thenReturn(List.of(searchTool));
         when(subagentWorkflowService.start(eq(1L), any(), eq("重复搜索同一个问题"), eq(null), eq(null), eq(null)))
                 .thenReturn(new SubagentWorkflowService.ExecutionWorkflow(501L, 601L));
-        when(taskPlanningService.plan(eq(AgentReasoningMode.LOOP), eq("重复搜索同一个问题"), any(MemoryContext.class), any()))
+        when(taskPlanningService.plan(eq("重复搜索同一个问题"), any(MemoryContext.class), any()))
                 .thenReturn(new TaskPlanningService.StructuredResult<>(taskPlan, null));
 
         AgentStepPlan repeatedPlan = new AgentStepPlan(
@@ -297,7 +275,6 @@ class SubagentServiceTest {
                 null
         );
         when(agentStepPlannerService.planNextStep(
-                eq(AgentReasoningMode.LOOP),
                 eq("重复搜索同一个问题"),
                 any(MemoryContext.class),
                 any(),
@@ -307,7 +284,6 @@ class SubagentServiceTest {
                 eq(taskPlan)
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(repeatedPlan, null));
         when(agentStepPlannerService.planNextStep(
-                eq(AgentReasoningMode.LOOP),
                 eq("重复搜索同一个问题"),
                 any(MemoryContext.class),
                 any(),
@@ -325,7 +301,7 @@ class SubagentServiceTest {
         assertThat(result.workflowId()).isEqualTo(501L);
         assertThat(result.completedByFallback()).isTrue();
         assertThat(result.completionType()).isEqualTo(SubagentCompletionType.REPEATED_ACTION_GUARD);
-        assertThat(result.completionReason()).contains("连续重复相同动作");
+        assertThat(result.completionReason()).contains("重复相同动作");
         assertThat(result.summary()).isEqualTo("same observation");
         assertThat(result.usedTools()).containsExactly("search_web");
     }

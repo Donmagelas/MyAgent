@@ -1,6 +1,5 @@
 package com.example.agentplatform.chat.service;
 
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.auth.domain.AuthenticatedUserPrincipal;
 import com.example.agentplatform.auth.domain.SecurityRole;
 import com.example.agentplatform.auth.dto.AuthLoginRequest;
@@ -21,7 +20,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,7 +45,6 @@ class MeetupPlannerAgentLiveSmokeTest {
         ChatAskRequest request = new ChatAskRequest(
                 "live-meetup-" + UUID.randomUUID(),
                 "我们两个人想在苏州喝咖啡，我在苏州大学独墅湖校区，小王在苏州工业园区湖东邻里中心，推荐一个大家通勤都公平的地方。",
-                AgentReasoningMode.LOOP,
                 8,
                 false,
                 null

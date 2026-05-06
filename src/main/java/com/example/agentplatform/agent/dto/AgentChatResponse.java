@@ -1,6 +1,5 @@
 package com.example.agentplatform.agent.dto;
 
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
 
 import java.util.List;
@@ -13,7 +12,6 @@ public record AgentChatResponse(
         Long workflowId,
         Long conversationId,
         String sessionId,
-        AgentReasoningMode mode,
         String answer,
         String reasoningSummary,
         int stepCount,

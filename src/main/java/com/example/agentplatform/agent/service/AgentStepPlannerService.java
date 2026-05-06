@@ -1,7 +1,5 @@
 package com.example.agentplatform.agent.service;
 
-import com.example.agentplatform.agent.domain.AgentCotResult;
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.AgentStepPlan;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.chat.service.SpringAiChatResponseMapper;
@@ -22,7 +20,7 @@ import java.util.Map;
 
 /**
  * Agent 单步规划服务。
- * 负责把 CoT 和多步 ReAct/Loop 决策转换为结构化结果。
+ * 负责把统一 Agent Loop 的每一步决策转换成结构化结果。
  */
 @Service
 public class AgentStepPlannerService {
@@ -48,29 +46,9 @@ public class AgentStepPlannerService {
     }
 
     /**
-     * 执行一次 CoT 单轮推理。
-     */
-    public StructuredResult<AgentCotResult> planCot(String message, MemoryContext memoryContext) {
-        BeanOutputConverter<AgentCotResult> outputConverter = new BeanOutputConverter<>(AgentCotResult.class);
-        ChatClientResponse response = chatClient.prompt()
-                .options(new DefaultChatOptionsBuilder()
-                        .model(aiModelProperties.chatModel())
-                        .temperature(agentProperties.cot().temperature())
-                        .maxTokens(agentProperties.cot().maxTokens())
-                        .build())
-                .system(agentPromptService.buildCotSystemPrompt(memoryContext) + "\n\n" + outputConverter.getFormat())
-                .user(message)
-                .call()
-                .chatClientResponse();
-        String content = springAiChatResponseMapper.extractAnswer(response.chatResponse());
-        return new StructuredResult<>(outputConverter.convert(content), response);
-    }
-
-    /**
-     * 执行一次 ReAct / Agent Loop 规划。
+     * 执行一次统一 Agent Loop 规划。
      */
     public StructuredResult<AgentStepPlan> planNextStep(
-            AgentReasoningMode mode,
             String message,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
@@ -78,14 +56,13 @@ public class AgentStepPlannerService {
             int stepIndex,
             int maxSteps
     ) {
-        return planNextStep(mode, message, memoryContext, availableTools, scratchpad, stepIndex, maxSteps, null);
+        return planNextStep(message, memoryContext, availableTools, scratchpad, stepIndex, maxSteps, null, null);
     }
 
     /**
-     * 执行一次 ReAct / Agent Loop 规划，并允许传入任务计划。
+     * 执行一次统一 Agent Loop 规划，并允许传入任务计划。
      */
     public StructuredResult<AgentStepPlan> planNextStep(
-            AgentReasoningMode mode,
             String message,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
@@ -94,14 +71,13 @@ public class AgentStepPlannerService {
             int maxSteps,
             TaskPlan taskPlan
     ) {
-        return planNextStep(mode, message, memoryContext, availableTools, scratchpad, stepIndex, maxSteps, taskPlan, null);
+        return planNextStep(message, memoryContext, availableTools, scratchpad, stepIndex, maxSteps, taskPlan, null);
     }
 
     /**
-     * 执行带 skill 上下文的 ReAct / Agent Loop 规划。
+     * 执行带 skill 上下文的统一 Agent Loop 规划。
      */
     public StructuredResult<AgentStepPlan> planNextStep(
-            AgentReasoningMode mode,
             String message,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
@@ -119,7 +95,6 @@ public class AgentStepPlannerService {
                         .maxTokens(agentProperties.loop().plannerMaxTokens())
                         .build())
                 .system(agentPromptService.buildLoopPlannerSystemPrompt(
-                                mode,
                                 memoryContext,
                                 availableTools,
                                 taskPlan,

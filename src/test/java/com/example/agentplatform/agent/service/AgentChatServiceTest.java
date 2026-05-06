@@ -1,17 +1,15 @@
 package com.example.agentplatform.agent.service;
 
 import com.example.agentplatform.advisor.domain.AdvisorOperation;
-import com.example.agentplatform.advisor.domain.ChatAdvisorContext;
+import com.example.agentplatform.auth.domain.SecurityRole;
+import com.example.agentplatform.auth.service.AuthenticatedUserAccessor;
 import com.example.agentplatform.advisor.service.ChatAdvisorExecutor;
 import com.example.agentplatform.agent.domain.AgentActionType;
-import com.example.agentplatform.agent.domain.AgentCotResult;
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.AgentStepPlan;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.agent.domain.TaskPlanStep;
 import com.example.agentplatform.agent.dto.AgentChatRequest;
 import com.example.agentplatform.agent.dto.AgentChatResponse;
-import com.example.agentplatform.auth.service.AuthenticatedUserAccessor;
 import com.example.agentplatform.chat.domain.ChatMessage;
 import com.example.agentplatform.chat.domain.Conversation;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
@@ -19,16 +17,15 @@ import com.example.agentplatform.chat.service.ChatCompletionClient;
 import com.example.agentplatform.chat.service.ChatPersistenceService;
 import com.example.agentplatform.chat.service.ChatUsageService;
 import com.example.agentplatform.chat.service.SpringAiChatResponseMapper;
-import com.example.agentplatform.auth.domain.SecurityRole;
 import com.example.agentplatform.config.AgentProperties;
 import com.example.agentplatform.config.AiModelProperties;
 import com.example.agentplatform.memory.advisor.MemoryContextAdvisor;
 import com.example.agentplatform.memory.domain.MemoryContext;
 import com.example.agentplatform.rag.domain.RagAnswerJudgeResult;
 import com.example.agentplatform.rag.domain.RagEvidenceAssessment;
+import com.example.agentplatform.rag.domain.RetrievedChunk;
 import com.example.agentplatform.rag.service.RagAnswerJudgeService;
 import com.example.agentplatform.rag.service.RagEvidenceGuardService;
-import com.example.agentplatform.rag.domain.RetrievedChunk;
 import com.example.agentplatform.skills.router.SkillRouterService;
 import com.example.agentplatform.skills.service.SkillToolSelector;
 import com.example.agentplatform.tools.domain.PermissionContext;
@@ -60,14 +57,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Agent 对话服务测试。
- * 覆盖 CoT、统一 loop 内的 RAG 动作，以及工具直返路径。
+ * 这里只覆盖统一 Agent Loop 主链，不再保留独立模式分支测试。
  */
 @ExtendWith(MockitoExtension.class)
 class AgentChatServiceTest {
@@ -114,8 +111,6 @@ class AgentChatServiceTest {
     private ToolCallback toolCallback;
 
     private AgentChatService agentChatService;
-    private AgentProperties agentProperties;
-    private AiModelProperties aiModelProperties;
     private Conversation conversation;
     private ChatMessage userMessage;
     private ChatMessage assistantMessage;
@@ -123,15 +118,13 @@ class AgentChatServiceTest {
 
     @BeforeEach
     void setUp() {
-        agentProperties = new AgentProperties(
+        AgentProperties agentProperties = new AgentProperties(
                 true,
-                AgentReasoningMode.LOOP,
-                new AgentProperties.Cot(0.0, 512),
                 new AgentProperties.Planning(true, 0.0, 768),
                 new AgentProperties.Loop(6, 0.0, 512),
                 new AgentProperties.Subagent(true, 4, true, 2, 2, List.of("search_web", "fetch_webpage"))
         );
-        aiModelProperties = new AiModelProperties("qwen3.5-flash", 0.2d, "qwen3-vl-embedding", "qwen3-vl-rerank");
+        AiModelProperties aiModelProperties = new AiModelProperties("qwen3.5-flash", 0.2d, "qwen3-vl-embedding", "qwen3-vl-rerank");
         lenient().when(skillRouterService.route(any())).thenReturn(Optional.empty());
         agentChatService = new AgentChatService(
                 agentProperties,
@@ -191,48 +184,12 @@ class AgentChatServiceTest {
     }
 
     @Test
-    void shouldHandleCotMode() {
-        AgentChatRequest request = new AgentChatRequest("agent-session", "请简要解释 PostgreSQL 是什么", AgentReasoningMode.COT, null);
-        ChatClientResponse clientResponse = buildClientResponse();
-        AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow =
-                new AgentExecutionWorkflowService.ExecutionWorkflow(101L, 201L, AgentReasoningMode.COT);
-
-        when(memoryContextAdvisor.buildContext(1L, 10L, request.message())).thenReturn(memoryContext);
-        when(agentExecutionWorkflowService.start(1L, conversation, request.message(), AgentReasoningMode.COT))
-                .thenReturn(executionWorkflow);
-        when(agentStepPlannerService.planCot(request.message(), memoryContext))
-                .thenReturn(new AgentStepPlannerService.StructuredResult<>(
-                        new AgentCotResult("基于已有知识直接给出简答", "PostgreSQL 是一个开源关系型数据库。"),
-                        clientResponse
-                ));
-        when(springAiChatResponseMapper.toResult(clientResponse.chatResponse()))
-                .thenReturn(new ChatCompletionClient.ChatCompletionResult("req-1", "qwen3.5-flash", "ok", 10, 20, 30));
-        when(chatPersistenceService.saveAssistantMessage(1L, 10L, "PostgreSQL 是一个开源关系型数据库。", "qwen3.5-flash"))
-                .thenReturn(assistantMessage);
-
-        AgentChatResponse response = agentChatService.chat(request, authentication);
-
-        assertThat(response.mode()).isEqualTo(AgentReasoningMode.COT);
-        assertThat(response.answer()).isEqualTo("PostgreSQL 是一个开源关系型数据库。");
-        assertThat(response.reasoningSummary()).isEqualTo("基于已有知识直接给出简答");
-        assertThat(response.sources()).isEmpty();
-        verify(agentExecutionWorkflowService).recordPlanningStep(
-                1L,
-                executionWorkflow,
-                1,
-                "基于已有知识直接给出简答",
-                AgentActionType.FINAL,
-                null,
-                "PostgreSQL 是一个开源关系型数据库。"
-        );
-    }
-
-    @Test
     void shouldHandleLoopModeWithRagAction() {
-        AgentChatRequest request = new AgentChatRequest("agent-session", "项目里如何使用 rerank？", AgentReasoningMode.LOOP, 3);
+        AgentChatRequest request = new AgentChatRequest("agent-session", "项目里如何使用 rerank？", 3);
         ChatClientResponse clientResponse = buildClientResponse();
+        TaskPlan taskPlan = new TaskPlan("回答 rerank 问题", "先检索证据，再组织答案", List.of());
         AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow =
-                new AgentExecutionWorkflowService.ExecutionWorkflow(102L, 202L, AgentReasoningMode.LOOP);
+                new AgentExecutionWorkflowService.ExecutionWorkflow(102L, 202L);
         ChatAskResponse.SourceItem sourceItem = new ChatAskResponse.SourceItem(
                 64L,
                 "ChunkSmokeJsonRetest3",
@@ -256,7 +213,7 @@ class AgentChatServiceTest {
         );
 
         when(memoryContextAdvisor.buildContext(1L, 10L, request.message())).thenReturn(memoryContext);
-        when(agentExecutionWorkflowService.start(1L, conversation, request.message(), AgentReasoningMode.LOOP))
+        when(agentExecutionWorkflowService.start(1L, conversation, request.message()))
                 .thenReturn(executionWorkflow);
         when(toolPermissionContextFactory.create(authentication)).thenReturn(new PermissionContext(
                 1L,
@@ -268,34 +225,22 @@ class AgentChatServiceTest {
                 false
         ));
         when(toolResolverService.resolve(any())).thenReturn(List.of());
-        when(taskPlanningService.plan(AgentReasoningMode.LOOP, request.message(), memoryContext, List.of(), null))
-                .thenReturn(new TaskPlanningService.StructuredResult<>(
-                        new TaskPlan("回答 rerank 问题", "先检索证据，再给出结论", List.of()),
-                        clientResponse
-                ));
+        when(taskPlanningService.plan(request.message(), memoryContext, List.of(), null))
+                .thenReturn(new TaskPlanningService.StructuredResult<>(taskPlan, clientResponse));
         when(agentStepPlannerService.planNextStep(
-                AgentReasoningMode.LOOP,
                 request.message(),
                 memoryContext,
                 List.of(),
                 List.of(),
                 1,
                 3,
-                new TaskPlan("回答 rerank 问题", "先检索证据，再给出结论", List.of()),
+                taskPlan,
                 null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
-                new AgentStepPlan(
-                        "先去知识库拿证据",
-                        AgentActionType.RAG,
-                        "project.retrieval.rerank",
-                        null,
-                        null,
-                        null
-                ),
+                new AgentStepPlan("先去知识库拿证据", AgentActionType.RAG, "project.retrieval.rerank", null, null, null),
                 clientResponse
         ));
         when(agentStepPlannerService.planNextStep(
-                AgentReasoningMode.LOOP,
                 request.message(),
                 memoryContext,
                 List.of(),
@@ -303,21 +248,14 @@ class AgentChatServiceTest {
                         "step", 1,
                         "thought", "先去知识库拿证据",
                         "action", "RAG:project.retrieval.rerank",
-                        "observation", "RAG 检索完成。query=project.retrieval.rerank，命中 1 条证据。\n- project.retrieval.rerank | project.retrieval.rerank | vector+keyword+rerank | score=0.9800"
+                        "observation", "RAG 检索完成"
                 )),
                 2,
                 3,
-                new TaskPlan("回答 rerank 问题", "先检索证据，再给出结论", List.of()),
+                taskPlan,
                 null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
-                new AgentStepPlan(
-                        "证据已足够，直接回答",
-                        AgentActionType.FINAL,
-                        null,
-                        null,
-                        null,
-                        "项目里使用 qwen3-vl-rerank 对向量检索和关键词检索的候选结果做重排。"
-                ),
+                new AgentStepPlan("证据已足够，直接回答", AgentActionType.FINAL, null, null, null, "项目里使用 qwen3-vl-rerank 对候选结果做重排。"),
                 clientResponse
         ));
         when(agentRagActionService.retrieve("project.retrieval.rerank", 102L))
@@ -325,7 +263,7 @@ class AgentChatServiceTest {
                         "project.retrieval.rerank",
                         List.of(retrievedChunk),
                         List.of(sourceItem),
-                        "RAG 检索完成。query=project.retrieval.rerank，命中 1 条证据。\n- project.retrieval.rerank | project.retrieval.rerank | vector+keyword+rerank | score=0.9800"
+                        "RAG 检索完成"
                 ));
         when(ragEvidenceGuardService.assess(eq(request.message()), any()))
                 .thenReturn(new RagEvidenceAssessment(true, "enough", 1, 0.98d, 1.0d));
@@ -336,16 +274,11 @@ class AgentChatServiceTest {
                 ));
         when(springAiChatResponseMapper.toResult(clientResponse.chatResponse()))
                 .thenReturn(new ChatCompletionClient.ChatCompletionResult("req-2", "qwen3.5-flash", "ok", 10, 20, 30));
-        when(chatPersistenceService.saveAssistantMessage(
-                1L,
-                10L,
-                "项目里使用 qwen3-vl-rerank 对向量检索和关键词检索的候选结果做重排。",
-                "qwen3.5-flash"
-        )).thenReturn(assistantMessage);
+        when(chatPersistenceService.saveAssistantMessage(1L, 10L, "项目里使用 qwen3-vl-rerank 对候选结果做重排。", "qwen3.5-flash"))
+                .thenReturn(assistantMessage);
 
         AgentChatResponse response = agentChatService.chat(request, authentication);
 
-        assertThat(response.mode()).isEqualTo(AgentReasoningMode.LOOP);
         assertThat(response.sources()).hasSize(1);
         assertThat(response.sources().get(0).chunkTitle()).isEqualTo("project.retrieval.rerank");
         verify(chatAdvisorExecutor).execute(argThat(context ->
@@ -359,16 +292,17 @@ class AgentChatServiceTest {
                 1,
                 "project.retrieval.rerank",
                 1,
-                "RAG 检索完成。query=project.retrieval.rerank，命中 1 条证据。\n- project.retrieval.rerank | project.retrieval.rerank | vector+keyword+rerank | score=0.9800"
+                "RAG 检索完成"
         );
     }
 
     @Test
     void shouldForceRagOnFirstStepWhenKnowledgeQuestionHeuristicMatches() {
-        AgentChatRequest request = new AgentChatRequest("agent-session", "项目里 rerank 模型是什么，如何配置？", AgentReasoningMode.LOOP, 3);
+        AgentChatRequest request = new AgentChatRequest("agent-session", "项目里 rerank 模型是什么，如何配置？", 3);
         ChatClientResponse clientResponse = buildClientResponse();
+        TaskPlan taskPlan = new TaskPlan("回答 rerank 配置问题", "先检索证据，再组织答案", List.of());
         AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow =
-                new AgentExecutionWorkflowService.ExecutionWorkflow(103L, 203L, AgentReasoningMode.LOOP);
+                new AgentExecutionWorkflowService.ExecutionWorkflow(103L, 203L);
         ChatAskResponse.SourceItem sourceItem = new ChatAskResponse.SourceItem(
                 65L,
                 "Rerank Guide",
@@ -395,7 +329,7 @@ class AgentChatServiceTest {
                 new SimpleGrantedAuthority(SecurityRole.authority(SecurityRole.KNOWLEDGE_USER))
         )).when(authentication).getAuthorities();
         when(memoryContextAdvisor.buildContext(1L, 10L, request.message())).thenReturn(memoryContext);
-        when(agentExecutionWorkflowService.start(1L, conversation, request.message(), AgentReasoningMode.LOOP))
+        when(agentExecutionWorkflowService.start(1L, conversation, request.message()))
                 .thenReturn(executionWorkflow);
         when(toolPermissionContextFactory.create(authentication)).thenReturn(new PermissionContext(
                 1L,
@@ -407,62 +341,43 @@ class AgentChatServiceTest {
                 false
         ));
         when(toolResolverService.resolve(any())).thenReturn(List.of());
-        when(taskPlanningService.plan(AgentReasoningMode.LOOP, request.message(), memoryContext, List.of(), null))
-                .thenReturn(new TaskPlanningService.StructuredResult<>(
-                        new TaskPlan("回答 rerank 配置问题", "先检索证据，再给出结论", List.of()),
-                        clientResponse
-                ));
+        when(taskPlanningService.plan(request.message(), memoryContext, List.of(), null))
+                .thenReturn(new TaskPlanningService.StructuredResult<>(taskPlan, clientResponse));
         when(agentStepPlannerService.planNextStep(
-                AgentReasoningMode.LOOP,
                 request.message(),
                 memoryContext,
                 List.of(),
                 List.of(),
                 1,
                 3,
-                new TaskPlan("回答 rerank 配置问题", "先检索证据，再给出结论", List.of()),
+                taskPlan,
                 null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
-                new AgentStepPlan(
-                        "我记得这个问题和项目配置有关，可以直接回答。",
-                        AgentActionType.FINAL,
-                        null,
-                        null,
-                        null,
-                        "项目里使用 qwen3-vl-rerank。"
-                ),
+                new AgentStepPlan("先尝试直接回答", AgentActionType.FINAL, null, null, null, "项目里使用 qwen3-vl-rerank。"),
                 clientResponse
         ));
         when(agentStepPlannerService.planNextStep(
-                AgentReasoningMode.LOOP,
                 request.message(),
                 memoryContext,
                 List.of(),
                 List.of(Map.of(
                         "step", 1,
-                        "thought", "我记得这个问题和项目配置有关，可以直接回答。 知识型问题启发式命中：命中知识型问题词 + 命中领域事实词 + 命中结构化标识",
+                        "thought", "先尝试直接回答 知识型问题启发式命中",
                         "action", "RAG:项目里 rerank 模型是什么，如何配置？",
-                        "observation", "RAG 检索完成。query=项目里 rerank 模型是什么，如何配置？，命中 1 条证据。\n- Retrieval Rerank | project.retrieval.rerank | vector+keyword+rerank | score=0.9600"
+                        "observation", "RAG 检索完成"
                 )),
                 2,
                 3,
-                new TaskPlan("回答 rerank 配置问题", "先检索证据，再给出结论", List.of()),
+                taskPlan,
                 null
         )).thenReturn(new AgentStepPlannerService.StructuredResult<>(
-                new AgentStepPlan(
-                        "证据已确认，直接回答。",
-                        AgentActionType.FINAL,
-                        null,
-                        null,
-                        null,
-                        "项目里使用 qwen3-vl-rerank 对候选结果做重排。"
-                ),
+                new AgentStepPlan("证据已确认，直接回答", AgentActionType.FINAL, null, null, null, "项目里使用 qwen3-vl-rerank 对候选结果做重排。"),
                 clientResponse
         ));
         when(agentRagRoutingService.decide(request, memoryContext, 103L)).thenReturn(
                 AgentRagRoutingService.RagRoutingDecision.force(
                         "heuristic",
-                        "知识型问题启发式命中：命中知识型问题词 + 命中领域事实词 + 命中结构化标识",
+                        "知识型问题启发式命中",
                         request.message(),
                         null
                 )
@@ -472,7 +387,7 @@ class AgentChatServiceTest {
                         request.message(),
                         List.of(retrievedChunk),
                         List.of(sourceItem),
-                        "RAG 检索完成。query=项目里 rerank 模型是什么，如何配置？，命中 1 条证据。\n- Retrieval Rerank | project.retrieval.rerank | vector+keyword+rerank | score=0.9600"
+                        "RAG 检索完成"
                 ));
         when(ragEvidenceGuardService.assess(eq(request.message()), any()))
                 .thenReturn(new RagEvidenceAssessment(true, "enough", 1, 0.96d, 1.0d));
@@ -483,12 +398,8 @@ class AgentChatServiceTest {
                 ));
         when(springAiChatResponseMapper.toResult(clientResponse.chatResponse()))
                 .thenReturn(new ChatCompletionClient.ChatCompletionResult("req-3", "qwen3.5-flash", "ok", 10, 20, 30));
-        when(chatPersistenceService.saveAssistantMessage(
-                1L,
-                10L,
-                "项目里使用 qwen3-vl-rerank 对候选结果做重排。",
-                "qwen3.5-flash"
-        )).thenReturn(assistantMessage);
+        when(chatPersistenceService.saveAssistantMessage(1L, 10L, "项目里使用 qwen3-vl-rerank 对候选结果做重排。", "qwen3.5-flash"))
+                .thenReturn(assistantMessage);
 
         AgentChatResponse response = agentChatService.chat(request, authentication);
 
@@ -502,19 +413,12 @@ class AgentChatServiceTest {
     }
 
     @Test
-    void shouldHandleReactModeWithDirectToolReturn() {
-        AgentChatRequest request = new AgentChatRequest(
-                "agent-session",
-                "请使用 generate_pdf 工具生成一个 PDF",
-                AgentReasoningMode.REACT,
-                3
-        );
+    void shouldHandleLoopModeWithDirectToolReturn() {
+        AgentChatRequest request = new AgentChatRequest("agent-session", "请使用 generate_pdf 工具生成一个 PDF", 3);
         ChatClientResponse clientResponse = buildClientResponse();
-        AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow =
-                new AgentExecutionWorkflowService.ExecutionWorkflow(103L, 203L, AgentReasoningMode.REACT);
         TaskPlan taskPlan = new TaskPlan(
                 "生成 PDF",
-                "先准备内容，再调用 PDF 工具生成文件",
+                "先准备内容，再调用 PDF 工具输出文件",
                 List.of(new TaskPlanStep(
                         "step-1",
                         "调用 PDF 工具",
@@ -525,6 +429,8 @@ class AgentChatServiceTest {
                         "拿到 PDF 生成结果"
                 ))
         );
+        AgentExecutionWorkflowService.ExecutionWorkflow executionWorkflow =
+                new AgentExecutionWorkflowService.ExecutionWorkflow(104L, 204L);
         PermissionContext permissionContext = new PermissionContext(
                 1L,
                 "chat_user",
@@ -557,14 +463,13 @@ class AgentChatServiceTest {
         );
 
         when(memoryContextAdvisor.buildContext(1L, 10L, request.message())).thenReturn(memoryContext);
-        when(agentExecutionWorkflowService.start(1L, conversation, request.message(), AgentReasoningMode.REACT))
+        when(agentExecutionWorkflowService.start(1L, conversation, request.message()))
                 .thenReturn(executionWorkflow);
         when(toolPermissionContextFactory.create(authentication)).thenReturn(permissionContext);
         when(toolResolverService.resolve(any())).thenReturn(List.of(registeredTool));
-        when(taskPlanningService.plan(AgentReasoningMode.REACT, request.message(), memoryContext, List.of(registeredTool), null))
+        when(taskPlanningService.plan(request.message(), memoryContext, List.of(registeredTool), null))
                 .thenReturn(new TaskPlanningService.StructuredResult<>(taskPlan, clientResponse));
         when(agentStepPlannerService.planNextStep(
-                AgentReasoningMode.REACT,
                 request.message(),
                 memoryContext,
                 List.of(registeredTool),
@@ -585,15 +490,15 @@ class AgentChatServiceTest {
                 clientResponse
         ));
         when(springAiChatResponseMapper.toResult(clientResponse.chatResponse()))
-                .thenReturn(new ChatCompletionClient.ChatCompletionResult("req-3", "qwen3.5-flash", "ok", 10, 20, 30));
+                .thenReturn(new ChatCompletionClient.ChatCompletionResult("req-4", "qwen3.5-flash", "ok", 10, 20, 30));
         when(agentToolExecutorService.isAvailableTool("generate_pdf", List.of(registeredTool))).thenReturn(true);
         when(agentToolExecutorService.execute(
                 "generate_pdf",
                 Map.of("title", "Agent Smoke", "content", "Hello Agent PDF"),
                 permissionContext,
                 conversation,
-                103L,
-                203L,
+                104L,
+                204L,
                 1
         )).thenReturn(new AgentToolExecutorService.ToolExecutionOutcome("generate_pdf", "PDF generated", true));
         when(springAiChatResponseMapper.toResult(isNull(), eq("qwen3.5-flash"), eq("PDF generated"), isNull(), isNull(), isNull()))
@@ -603,7 +508,6 @@ class AgentChatServiceTest {
 
         AgentChatResponse response = agentChatService.chat(request, authentication);
 
-        assertThat(response.mode()).isEqualTo(AgentReasoningMode.REACT);
         assertThat(response.answer()).isEqualTo("PDF generated");
         assertThat(response.toolNames()).containsExactly("generate_pdf");
         assertThat(response.stepCount()).isEqualTo(1);

@@ -1,7 +1,6 @@
 package com.example.agentplatform.agent.service;
 
 import com.example.agentplatform.agent.domain.AgentActionType;
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.AgentStepPlan;
 import com.example.agentplatform.agent.domain.SubagentCompletionType;
 import com.example.agentplatform.agent.domain.TaskPlan;
@@ -91,7 +90,6 @@ public class SubagentService {
                 && agentProperties.planning().enabled()
                 && agentProperties.subagent().planningEnabled()) {
             taskPlan = taskPlanningService.plan(
-                    AgentReasoningMode.LOOP,
                     prompt,
                     memoryContext,
                     availableTools
@@ -115,7 +113,6 @@ public class SubagentService {
         try {
             for (int stepIndex = 1; stepIndex <= maxTurns; stepIndex++) {
                 AgentStepPlannerService.StructuredResult<AgentStepPlan> result = agentStepPlannerService.planNextStep(
-                        AgentReasoningMode.LOOP,
                         prompt,
                         memoryContext,
                         availableTools,

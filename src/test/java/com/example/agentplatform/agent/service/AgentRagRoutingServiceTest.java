@@ -1,6 +1,5 @@
 package com.example.agentplatform.agent.service;
 
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.RagIntentClassification;
 import com.example.agentplatform.agent.domain.RagIntentDecision;
 import com.example.agentplatform.agent.dto.AgentChatRequest;
@@ -62,8 +61,7 @@ class AgentRagRoutingServiceTest {
     void shouldForceRagWhenUserExplicitlyPrefersKnowledgeRetrieval() {
         AgentChatRequest request = new AgentChatRequest(
                 "session",
-                "这份文档讲了什么",
-                AgentReasoningMode.LOOP,
+                "这份文档讲了什么？",
                 3,
                 true,
                 "guide.md"
@@ -73,7 +71,7 @@ class AgentRagRoutingServiceTest {
 
         assertThat(decision.forceRag()).isTrue();
         assertThat(decision.routeSource()).isEqualTo("explicit");
-        assertThat(decision.retrievalQuery()).contains("这份文档讲了什么", "guide.md");
+        assertThat(decision.retrievalQuery()).contains("这份文档讲了什么？", "guide.md");
         verify(classifierService, never()).classify(
                 org.mockito.Mockito.any(),
                 org.mockito.Mockito.any(),
@@ -85,7 +83,7 @@ class AgentRagRoutingServiceTest {
 
     @Test
     void shouldForceRagWhenClassifierReturnsMustRagWithEnoughConfidence() {
-        AgentChatRequest request = new AgentChatRequest("session", "项目 rerank 模型如何配置", AgentReasoningMode.LOOP, 3);
+        AgentChatRequest request = new AgentChatRequest("session", "项目 rerank 模型如何配置", 3);
         AgentRagRoutingHeuristicService.RagRoutingDecision heuristicDecision =
                 AgentRagRoutingHeuristicService.RagRoutingDecision.skip("信号不足");
         when(heuristicService.decide(request.message())).thenReturn(heuristicDecision);
@@ -108,7 +106,7 @@ class AgentRagRoutingServiceTest {
 
     @Test
     void shouldUseRetrievalProbeWhenClassifierReturnsMaybeRag() {
-        AgentChatRequest request = new AgentChatRequest("session", "哈基米在资料里是什么意思", AgentReasoningMode.LOOP, 3);
+        AgentChatRequest request = new AgentChatRequest("session", "哈基米在资料里是什么意思", 3);
         AgentRagRoutingHeuristicService.RagRoutingDecision heuristicDecision =
                 AgentRagRoutingHeuristicService.RagRoutingDecision.skip("信号不足");
         when(heuristicService.decide(request.message())).thenReturn(heuristicDecision);
@@ -133,9 +131,9 @@ class AgentRagRoutingServiceTest {
 
     @Test
     void shouldRespectHighConfidenceNoRagClassifierBeforeHeuristicFallback() {
-        AgentChatRequest request = new AgentChatRequest("session", "帮我写一首诗", AgentReasoningMode.LOOP, 3);
+        AgentChatRequest request = new AgentChatRequest("session", "帮我写一首诗", 3);
         AgentRagRoutingHeuristicService.RagRoutingDecision heuristicDecision =
-                AgentRagRoutingHeuristicService.RagRoutingDecision.force("误命中启发式");
+                AgentRagRoutingHeuristicService.RagRoutingDecision.force("诗命中启发式");
         when(heuristicService.decide(request.message())).thenReturn(heuristicDecision);
         when(classifierService.classify(request.message(), memoryContext, false, null, heuristicDecision))
                 .thenReturn(classifierResult(new RagIntentClassification(

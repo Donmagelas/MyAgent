@@ -1,6 +1,5 @@
 package com.example.agentplatform.agent.service;
 
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
 import com.example.agentplatform.chat.service.DirectPromptService;
@@ -16,8 +15,7 @@ import java.util.stream.Collectors;
 
 /**
  * Agent 提示词服务。
- * 统一维护 CoT、任务规划、Loop 决策和最终回答所需的核心 prompt，
- * 避免关键提示词分散在多处业务逻辑中。
+ * 统一维护任务规划、Loop 决策和最终回答所需的核心 prompt。
  */
 @Service
 public class AgentPromptService {
@@ -31,37 +29,20 @@ public class AgentPromptService {
     }
 
     /**
-     * 构造 CoT 单轮推理的系统提示词。
-     */
-    public String buildCotSystemPrompt(MemoryContext memoryContext) {
-        return directPromptService.buildSystemPrompt(memoryContext) + """
-
-                You are running a CoT reasoning step for an enterprise agent.
-                Return a structured result only.
-                Requirements:
-                1. reasoningSummary must briefly explain the reasoning path and key evidence.
-                2. finalAnswer must be the direct user-facing answer.
-                3. If evidence is insufficient, say so explicitly instead of inventing facts.
-                4. Keep reasoningSummary concise and grounded in the provided context.
-                """;
-    }
-
-    /**
      * 构造任务规划阶段的系统提示词。
+     * 主链路已经统一为 Agent Loop，不再根据独立模式切换提示词。
      */
     public String buildTaskPlanningSystemPrompt(
-            AgentReasoningMode mode,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools
     ) {
-        return buildTaskPlanningSystemPrompt(mode, memoryContext, availableTools, null);
+        return buildTaskPlanningSystemPrompt(memoryContext, availableTools, null);
     }
 
     /**
      * 构造带 skill 上下文的任务规划系统提示词。
      */
     public String buildTaskPlanningSystemPrompt(
-            AgentReasoningMode mode,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
             ResolvedSkill resolvedSkill
@@ -78,12 +59,11 @@ public class AgentPromptService {
                 2. Prefer 1 to 4 steps unless the request is genuinely complex.
                 3. Each step must have a clear title, description, done condition, and suggested tools.
                 4. suggestedTools must only come from the available tools list.
-                5. Use the plan to support a ReAct / Agent Loop execution, not a human project plan.
+                5. Use the plan to support a unified Agent Loop execution, not a human project plan.
                 6. Avoid redundant steps, repeated retrieval, and generic filler steps.
                 7. If the task is simple enough to answer directly, you may return a one-step plan.
                 8. If the request is asking about stable product facts, gameplay systems, configuration, parameters, interfaces, fields, rules, or document-defined behavior, prefer a retrieval-first step before answering.
 
-                Current reasoning mode: %s
                 %s
 
                 Selected skill:
@@ -91,7 +71,7 @@ public class AgentPromptService {
 
                 Available tools:
                 %s
-                """.formatted(mode.name(), toolStrategy, renderSelectedSkill(resolvedSkill), describeTools(availableTools));
+                """.formatted(toolStrategy, renderSelectedSkill(resolvedSkill), describeTools(availableTools));
     }
 
     /**
@@ -117,19 +97,17 @@ public class AgentPromptService {
      * 构造统一 Agent Loop 的系统提示词。
      */
     public String buildLoopPlannerSystemPrompt(
-            AgentReasoningMode mode,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
             TaskPlan taskPlan
     ) {
-        return buildLoopPlannerSystemPrompt(mode, memoryContext, availableTools, taskPlan, null);
+        return buildLoopPlannerSystemPrompt(memoryContext, availableTools, taskPlan, null);
     }
 
     /**
      * 构造带 skill 上下文的统一 Agent Loop 系统提示词。
      */
     public String buildLoopPlannerSystemPrompt(
-            AgentReasoningMode mode,
             MemoryContext memoryContext,
             List<RegisteredTool> availableTools,
             TaskPlan taskPlan,
@@ -161,7 +139,6 @@ public class AgentPromptService {
                 Subagent guidance:
                 %s
 
-                Current reasoning mode: %s
                 Selected skill:
                 %s
 
@@ -172,7 +149,6 @@ public class AgentPromptService {
                 %s
                 """.formatted(
                 buildSubagentGuidance(availableTools),
-                mode.name(),
                 renderSelectedSkill(resolvedSkill),
                 planSection,
                 describeTools(availableTools)

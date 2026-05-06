@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * 结构化任务计划。
- * 在正式进入 ReAct / Agent Loop 前，用于先把用户目标拆成显式步骤。
+ * 在正式进入统一 Agent Loop 前，用于先把用户目标拆成显式步骤。
  */
 public record TaskPlan(
         @JsonPropertyDescription("用户目标的直接复述。")

@@ -1,7 +1,6 @@
 package com.example.agentplatform.agent.service;
 
 import com.example.agentplatform.agent.domain.AgentActionType;
-import com.example.agentplatform.agent.domain.AgentReasoningMode;
 import com.example.agentplatform.agent.domain.TaskPlan;
 import com.example.agentplatform.agent.dto.AgentChatResponse;
 import com.example.agentplatform.chat.dto.ChatAskResponse;
@@ -21,7 +20,6 @@ public interface AgentExecutionListener {
      * 当会话和工作流已建立时触发。
      */
     default void onStart(
-            AgentReasoningMode mode,
             Long conversationId,
             String sessionId,
             Long workflowId

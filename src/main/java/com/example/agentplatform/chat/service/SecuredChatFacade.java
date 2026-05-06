@@ -52,7 +52,6 @@ public class SecuredChatFacade {
         return new AgentChatRequest(
                 request.sessionId(),
                 request.message(),
-                request.agentMode(),
                 request.agentMaxSteps(),
                 request.preferKnowledgeRetrieval(),
                 request.knowledgeDocumentHint()

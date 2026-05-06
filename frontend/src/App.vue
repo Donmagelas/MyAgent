@@ -144,7 +144,6 @@ const authState = reactive({
 
 const streamState = reactive({
   streaming: false,
-  mode: '',
   statusText: uiText.idle,
   documentUploading: false,
   documentStatus: '',
@@ -234,7 +233,6 @@ function createNewSession() {
   routeEvents.value = []
   workflowView.value = null
   resetSelectedSkill()
-  streamState.mode = ''
   streamState.statusText = uiText.switchedSession
   streamState.workflowId = null
   streamState.conversationId = null
@@ -273,7 +271,6 @@ async function openConversation(conversation) {
     resetSelectedSkill()
     streamState.workflowId = null
     streamState.conversationId = detail.conversationId
-    streamState.mode = ''
     streamState.statusText = uiText.enteredHistory
     streamState.documentStatus = ''
     uploadedKnowledgeDocument.value = null
@@ -322,7 +319,6 @@ async function sendMessage() {
   resetSelectedSkill()
   streamState.workflowId = null
   streamState.conversationId = null
-  streamState.mode = ''
   resetUsage()
 
   streamState.streaming = true
@@ -396,7 +392,6 @@ async function uploadKnowledgeDocument(file) {
 }
 
 function handleStreamEvent(event, assistantMessage) {
-  streamState.mode = event.mode || streamState.mode
   streamState.conversationId = event.conversationId ?? streamState.conversationId
   if (event.conversationId) {
     conversationState.selectedConversationId = event.conversationId
@@ -420,7 +415,7 @@ function handleStreamEvent(event, assistantMessage) {
 
   switch (event.type) {
     case 'start':
-      streamState.statusText = `${uiText.enteredRoute}${event.mode || 'chat'}`
+      streamState.statusText = `${uiText.enteredRoute}Agent Loop`
       break
     case 'sources':
       assistantMessage.sources = event.sources || []
@@ -698,10 +693,9 @@ function resolveRouteEventUsageKeys(routeEvent) {
     if (step) {
       keys.push(`agent-loop-plan-${step}`)
     }
-    keys.push('agent-cot-plan')
   }
   if (routeEvent.type === 'done') {
-    keys.push('agent-loop-final', 'agent-loop-direct-return', 'agent-cot-final')
+    keys.push('agent-loop-final', 'agent-loop-direct-return')
   }
   return keys
 }

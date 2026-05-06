@@ -9,7 +9,6 @@ import java.util.Map;
  */
 public record ChatStreamEvent(
         String type,
-        String mode,
         Long conversationId,
         String sessionId,
         String content,
@@ -22,39 +21,37 @@ public record ChatStreamEvent(
     /**
      * 创建流式开始事件。
      */
-    public static ChatStreamEvent start(String mode, Long conversationId, String sessionId) {
-        return start(mode, conversationId, sessionId, null);
+    public static ChatStreamEvent start(Long conversationId, String sessionId) {
+        return start(conversationId, sessionId, null);
     }
 
     /**
      * 创建带元数据的流式开始事件。
      */
     public static ChatStreamEvent start(
-            String mode,
             Long conversationId,
             String sessionId,
             Map<String, Object> metadata
     ) {
-        return new ChatStreamEvent("start", mode, conversationId, sessionId, null, null, null, null, metadata);
+        return new ChatStreamEvent("start", conversationId, sessionId, null, null, null, null, metadata);
     }
 
     /**
      * 创建用于返回 grounding 来源的事件。
      */
     public static ChatStreamEvent sources(
-            String mode,
             Long conversationId,
             String sessionId,
             List<ChatAskResponse.SourceItem> sources
     ) {
-        return new ChatStreamEvent("sources", mode, conversationId, sessionId, null, sources, null, null, null);
+        return new ChatStreamEvent("sources", conversationId, sessionId, null, sources, null, null, null);
     }
 
     /**
      * 创建一条增量文本 delta 事件。
      */
-    public static ChatStreamEvent delta(String mode, Long conversationId, String sessionId, String content) {
-        return new ChatStreamEvent("delta", mode, conversationId, sessionId, content, null, null, null, null);
+    public static ChatStreamEvent delta(Long conversationId, String sessionId, String content) {
+        return new ChatStreamEvent("delta", conversationId, sessionId, content, null, null, null, null);
     }
 
     /**
@@ -62,46 +59,43 @@ public record ChatStreamEvent(
      */
     public static ChatStreamEvent step(
             String type,
-            String mode,
             Long conversationId,
             String sessionId,
             String content,
             Map<String, Object> metadata
     ) {
-        return new ChatStreamEvent(type, mode, conversationId, sessionId, content, null, null, null, metadata);
+        return new ChatStreamEvent(type, conversationId, sessionId, content, null, null, null, metadata);
     }
 
     /**
      * 创建步骤级 usage 事件。
      */
     public static ChatStreamEvent usage(
-            String mode,
             Long conversationId,
             String sessionId,
             Usage usage,
             Map<String, Object> metadata
     ) {
-        return new ChatStreamEvent("usage", mode, conversationId, sessionId, null, null, usage, null, metadata);
+        return new ChatStreamEvent("usage", conversationId, sessionId, null, null, usage, null, metadata);
     }
 
     /**
      * 创建流式成功结束事件。
      */
     public static ChatStreamEvent done(
-            String mode,
             Long conversationId,
             String sessionId,
             String content,
             Usage usage
     ) {
-        return new ChatStreamEvent("done", mode, conversationId, sessionId, content, null, usage, null, null);
+        return new ChatStreamEvent("done", conversationId, sessionId, content, null, usage, null, null);
     }
 
     /**
      * 创建流式失败结束事件。
      */
-    public static ChatStreamEvent error(String mode, Long conversationId, String sessionId, String error) {
-        return new ChatStreamEvent("error", mode, conversationId, sessionId, null, null, null, error, null);
+    public static ChatStreamEvent error(Long conversationId, String sessionId, String error) {
+        return new ChatStreamEvent("error", conversationId, sessionId, null, null, null, error, null);
     }
 
     /**
